@@ -469,16 +469,37 @@ class CoreAssembler:
         except Exception as e:
             print(f"更新时间范围失败: {str(e)}")
     
-    def _connect_abc_to_lookdev(self, new_transforms, abc_node):
-        """连接ABC到lookdev几何体"""
+    def _connect_abc_to_lookdev(self, new_transforms, abc_node, connect_type="main"):
+        """连接ABC到lookdev几何体
+        
+        Args:
+            new_transforms: 新导入的transform列表
+            abc_node: ABC节点
+            connect_type (str): 连接类型 - "main"(主体), "cloth"(布料), "fur"(毛发)
+        """
         try:
             # 查找ABC几何体
             abc_meshes = self._find_abc_meshes(new_transforms, abc_node)
             print(f"找到 {len(abc_meshes)} 个ABC几何体")
             
-            # 查找lookdev几何体
-            lookdev_meshes = self._find_lookdev_meshes()
-            print(f"找到 {len(lookdev_meshes)} 个lookdev几何体")
+            # 根据连接类型查找对应的lookdev几何体
+            if connect_type == "main":
+                # 动画ABC只连接主体mesh，排除特殊组
+                print("   连接类型: 主体动画（排除布料和毛发组）")
+                lookdev_meshes = self._find_lookdev_meshes(exclude_special_groups=True)
+            elif connect_type == "cloth":
+                # 布料解算只连接布料组
+                print("   连接类型: 布料解算")
+                lookdev_meshes = self._find_clothes_group_meshes()
+            elif connect_type == "fur":
+                # 毛发解算只连接毛发组
+                print("   连接类型: 毛发解算")
+                lookdev_meshes = self._find_growth_group_meshes()
+            else:
+                # 默认获取所有mesh
+                lookdev_meshes = self._find_lookdev_meshes()
+            
+            print(f"找到 {len(lookdev_meshes)} 个目标lookdev几何体")
             
             if not abc_meshes or not lookdev_meshes:
                 print("❌ 未找到足够的几何体进行连接")
@@ -487,8 +508,9 @@ class CoreAssembler:
             # 执行连接
             self._connect_meshes(abc_meshes, lookdev_meshes)
             
-            # 处理特殊组的blendShape连接
-            self._handle_special_groups_blendshape()
+            # 只有主体动画才处理特殊组（已移除，改为独立处理）
+            # if connect_type == "main":
+            #     self._handle_special_groups_blendshape()
             
             # 隐藏ABC几何体
             self._hide_abc_meshes(abc_meshes)
@@ -604,13 +626,43 @@ class CoreAssembler:
         print(f"   最终找到 {len(abc_meshes)} 个ABC几何体")
         return abc_meshes
     
-    def _find_lookdev_meshes(self):
-        """查找lookdev几何体"""
+    def _find_lookdev_meshes(self, exclude_special_groups=False):
+        """查找lookdev几何体
+        
+        Args:
+            exclude_special_groups (bool): 是否排除特殊组（布料、毛发）中的mesh
+        
+        Returns:
+            dict: lookdev mesh字典
+        """
         lookdev_meshes = {}
+        
+        # 如果需要排除特殊组，先收集这些组中的mesh
+        excluded_transforms = set()
+        if exclude_special_groups:
+            print("   排除特殊组（布料和毛发）中的mesh...")
+            
+            # 查找并排除Clothes组中的mesh
+            clothes_groups = cmds.ls(f"{self.lookdev_namespace}:*Clothes*grp", f"{self.lookdev_namespace}:*clothes*grp", type='transform')
+            for group in clothes_groups:
+                children = cmds.listRelatives(group, allDescendents=True, type='transform', fullPath=True) or []
+                excluded_transforms.update(children)
+                print(f"     排除Clothes组: {group} ({len(children)} 个对象)")
+            
+            # 查找并排除growthmesh组中的mesh
+            growth_groups = cmds.ls(f"{self.lookdev_namespace}:*growth*", f"{self.lookdev_namespace}:*Growth*", type='transform')
+            for group in growth_groups:
+                children = cmds.listRelatives(group, allDescendents=True, type='transform', fullPath=True) or []
+                excluded_transforms.update(children)
+                print(f"     排除Growth组: {group} ({len(children)} 个对象)")
         
         lookdev_transforms = cmds.ls(f"{self.lookdev_namespace}:*", type='transform') or []
         
         for transform in lookdev_transforms:
+            # 检查是否应该排除
+            if exclude_special_groups and transform in excluded_transforms:
+                continue
+                
             shapes = cmds.listRelatives(transform, shapes=True, type='mesh') or []
             if shapes:
                 base_name = transform.split(':')[-1].lower()
@@ -619,7 +671,56 @@ class CoreAssembler:
                     'shape': shapes[0]
                 }
         
+        print(f"   找到 {len(lookdev_meshes)} 个lookdev mesh（排除特殊组: {exclude_special_groups}）")
         return lookdev_meshes
+    
+    def _find_clothes_group_meshes(self):
+        """查找Clothes组中的mesh"""
+        clothes_meshes = {}
+        
+        print("   查找Clothes组中的mesh...")
+        clothes_groups = cmds.ls(f"{self.lookdev_namespace}:*Clothes*grp", f"{self.lookdev_namespace}:*clothes*grp", type='transform')
+        
+        for group in clothes_groups:
+            print(f"     检查Clothes组: {group}")
+            transforms = cmds.listRelatives(group, allDescendents=True, type='transform', fullPath=True) or []
+            
+            for transform in transforms:
+                shapes = cmds.listRelatives(transform, shapes=True, type='mesh', noIntermediate=True) or []
+                if shapes:
+                    base_name = transform.split('|')[-1].split(':')[-1].lower()
+                    clothes_meshes[base_name] = {
+                        'transform': transform,
+                        'shape': shapes[0]
+                    }
+                    print(f"       找到布料mesh: {base_name}")
+        
+        print(f"   总计找到 {len(clothes_meshes)} 个布料mesh")
+        return clothes_meshes
+    
+    def _find_growth_group_meshes(self):
+        """查找Growth/growthmesh组中的mesh"""
+        growth_meshes = {}
+        
+        print("   查找Growth组中的mesh...")
+        growth_groups = cmds.ls(f"{self.lookdev_namespace}:*growth*", f"{self.lookdev_namespace}:*Growth*", type='transform')
+        
+        for group in growth_groups:
+            print(f"     检查Growth组: {group}")
+            transforms = cmds.listRelatives(group, allDescendents=True, type='transform', fullPath=True) or []
+            
+            for transform in transforms:
+                shapes = cmds.listRelatives(transform, shapes=True, type='mesh', noIntermediate=True) or []
+                if shapes:
+                    base_name = transform.split('|')[-1].split(':')[-1].lower()
+                    growth_meshes[base_name] = {
+                        'transform': transform,
+                        'shape': shapes[0]
+                    }
+                    print(f"       找到毛发mesh: {base_name}")
+        
+        print(f"   总计找到 {len(growth_meshes)} 个毛发mesh")
+        return growth_meshes
     
     def _connect_meshes(self, abc_meshes, lookdev_meshes):
         """连接ABC和lookdev几何体"""
@@ -1359,8 +1460,8 @@ class CoreAssembler:
                 
                 print(f"文件: {os.path.basename(file_path)}")
                 
-                # 连接ABC到lookdev
-                self._connect_abc_to_lookdev(new_transforms, abc_node)
+                # 连接ABC到lookdev（主体动画，排除特殊组）
+                self._connect_abc_to_lookdev(new_transforms, abc_node, connect_type="main")
                 
             except Exception as e:
                 print(f"❌ 连接第{i}个动画ABC失败: {str(e)}")
@@ -1472,6 +1573,94 @@ class CoreAssembler:
                 
         except Exception as e:
             print(f"从相机获取时间范围失败: {str(e)}")
+    
+    def import_and_connect_cloth_simulation(self, cloth_file):
+        """导入并连接布料解算文件
+        
+        Args:
+            cloth_file (str): 布料解算文件路径（ABC或MA）
+            
+        Returns:
+            bool: 是否成功
+        """
+        try:
+            print(f"\n=== 导入布料解算文件 ===")
+            
+            if not os.path.exists(cloth_file):
+                print(f"❌ 布料解算文件不存在: {cloth_file}")
+                return False
+            
+            # 记录导入前状态
+            transforms_before = set(cmds.ls(type='transform'))
+            
+            # 导入布料解算文件
+            file_ext = os.path.splitext(cloth_file)[1].lower()
+            if file_ext == '.abc':
+                cmds.AbcImport(cloth_file, mode="import")
+                print(f"✅ 导入布料ABC: {os.path.basename(cloth_file)}")
+            elif file_ext == '.ma':
+                cmds.file(cloth_file, i=True, namespace="cloth_sim")
+                print(f"✅ 导入布料Maya文件: {os.path.basename(cloth_file)}")
+            else:
+                print(f"❌ 不支持的文件格式: {file_ext}")
+                return False
+            
+            # 查找新导入的对象
+            transforms_after = set(cmds.ls(type='transform'))
+            new_transforms = list(transforms_after - transforms_before)
+            
+            # 连接到布料组
+            if new_transforms:
+                self._connect_abc_to_lookdev(new_transforms, None, connect_type="cloth")
+                print("✅ 布料解算已连接到Clothes组")
+                return True
+            else:
+                print("❌ 未找到新导入的布料对象")
+                return False
+                
+        except Exception as e:
+            print(f"❌ 导入布料解算失败: {str(e)}")
+            return False
+    
+    def import_and_connect_fur_simulation(self, fur_file):
+        """导入并连接毛发解算文件
+        
+        Args:
+            fur_file (str): 毛发解算文件路径（ABC）
+            
+        Returns:
+            bool: 是否成功
+        """
+        try:
+            print(f"\n=== 导入毛发解算文件 ===")
+            
+            if not os.path.exists(fur_file):
+                print(f"❌ 毛发解算文件不存在: {fur_file}")
+                return False
+            
+            # 记录导入前状态
+            transforms_before = set(cmds.ls(type='transform'))
+            
+            # 导入毛发解算文件
+            cmds.AbcImport(fur_file, mode="import")
+            print(f"✅ 导入毛发ABC: {os.path.basename(fur_file)}")
+            
+            # 查找新导入的对象
+            transforms_after = set(cmds.ls(type='transform'))
+            new_transforms = list(transforms_after - transforms_before)
+            
+            # 连接到毛发组
+            if new_transforms:
+                self._connect_abc_to_lookdev(new_transforms, None, connect_type="fur")
+                print("✅ 毛发解算已连接到Growth组")
+                return True
+            else:
+                print("❌ 未找到新导入的毛发对象")
+                return False
+                
+        except Exception as e:
+            print(f"❌ 导入毛发解算失败: {str(e)}")
+            return False
     
     def step4_setup_hair_cache(self):
         """步骤4: 设置毛发缓存和解算文件"""
@@ -1835,38 +2024,15 @@ class CoreAssembler:
         return summary
     
     def _handle_special_groups_blendshape(self):
-        """处理特殊组的blendShape连接 - Clothes_grp和chr_dwl_growthmesh_grp"""
-        print("\n=== 处理特殊组blendShape连接 ===")
-        
-        try:
-            # 查找特殊组
-            special_groups = self._find_special_groups()
-            
-            if not special_groups:
-                print("未找到需要处理的特殊组")
-                return False
-            
-            total_blendshapes = 0
-            
-            for group_type, groups in special_groups.items():
-                if len(groups) >= 2:
-                    print(f"\n处理 {group_type} 组:")
-                    cfx_group = groups[0]  # CFX组（源）
-                    ani_group = groups[1]  # 动画组（目标）
-                    
-                    blendshapes_created = self._create_blendshapes_for_groups(cfx_group, ani_group)
-                    total_blendshapes += blendshapes_created
-                    
-                    print(f"  {group_type} 组创建了 {blendshapes_created} 个blendShape")
-                else:
-                    print(f"⚠️  {group_type} 组数量不足 (找到 {len(groups)} 个，需要至少2个)")
-            
-            print(f"\n✅ 特殊组处理完成，总共创建了 {total_blendshapes} 个blendShape")
-            return total_blendshapes > 0
-            
-        except Exception as e:
-            print(f"❌ 特殊组处理失败: {str(e)}")
-            return False
+        """处理特殊组的blendShape连接 - 已弃用，改为分层驱动"""
+        print("\n=== 特殊组处理（已更新为分层驱动模式） ===")
+        print("   布料解算 -> 驱动Clothes组")
+        print("   毛发解算 -> 驱动Growth组")
+        print("   动画ABC -> 驱动主体mesh（排除特殊组）")
+        print("   请使用相应的导入方法：")
+        print("   - import_and_connect_cloth_simulation() 导入布料解算")
+        print("   - import_and_connect_fur_simulation() 导入毛发解算")
+        return True
     
     def _find_special_groups(self):
         """查找特殊组"""
