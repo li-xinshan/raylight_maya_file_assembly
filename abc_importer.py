@@ -234,35 +234,53 @@ class ABCImporter:
             abc_meshes = {}
             
             print(f"查找ABC meshes，共 {len(new_transforms)} 个新对象")
+            print(f"ABC节点: {abc_node}")
+            print(f"新对象列表: {new_transforms}")
             
             for transform in new_transforms:
                 try:
+                    print(f"  检查对象: {transform}")
+                    
                     # 获取mesh shape
                     mesh_shapes = cmds.listRelatives(transform, shapes=True, type='mesh', fullPath=True)
+                    print(f"    找到mesh shapes: {mesh_shapes}")
+                    
                     if mesh_shapes:
                         mesh_shape = mesh_shapes[0]
                         
                         # 获取不带命名空间的名称
                         clean_name = self._clean_mesh_name(transform)
+                        print(f"    清理后名称: {clean_name}")
                         
                         # 检查是否连接到ABC节点
+                        is_abc_mesh = False
                         if abc_node:
+                            # 检查多种连接方式
                             connections = cmds.listConnections(mesh_shape, source=True, type='AlembicNode')
                             if connections and abc_node in connections:
-                                abc_meshes[clean_name] = {
-                                    'transform': transform,
-                                    'shape': mesh_shape,
-                                    'original_name': transform.split('|')[-1]
-                                }
-                                print(f"  ABC mesh: {clean_name} -> {transform}")
-                        else:
-                            # 如果没有ABC节点，直接添加所有mesh
+                                is_abc_mesh = True
+                            else:
+                                # 也检查transform级别的连接
+                                transform_connections = cmds.listConnections(transform, source=True, type='AlembicNode')
+                                if transform_connections and abc_node in transform_connections:
+                                    is_abc_mesh = True
+                                else:
+                                    # 检查任何子级连接
+                                    all_connections = cmds.listConnections(transform, source=True, type='AlembicNode', shapes=True)
+                                    if all_connections and abc_node in all_connections:
+                                        is_abc_mesh = True
+                        
+                        # 如果找到ABC连接或者没有ABC节点，添加mesh
+                        if is_abc_mesh or not abc_node:
                             abc_meshes[clean_name] = {
                                 'transform': transform,
                                 'shape': mesh_shape,
                                 'original_name': transform.split('|')[-1]
                             }
-                            print(f"  导入mesh: {clean_name} -> {transform}")
+                            connection_status = "ABC mesh" if is_abc_mesh else "导入mesh"
+                            print(f"  {connection_status}: {clean_name} -> {transform}")
+                        else:
+                            print(f"  跳过未连接mesh: {clean_name} -> {transform}")
                             
                 except Exception as e:
                     print(f"  跳过对象 {transform}: {str(e)}")
