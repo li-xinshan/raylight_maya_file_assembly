@@ -1,0 +1,86 @@
+[
+    {
+        "asset_name": "dwl",
+        "asset_type": "chr",
+        "asset_task_name": "rig",
+        "asset_pipeline_name": "rig",
+        "asset_type_group_name": "element",
+        "asset_source": "P:/LHSN/publish/asset/chr/dwl/element/rig/rig/LHSN_chr_dwl_rig_rig_v024.ma",
+        "asset_version": "v024",
+        "asset_task_module": "asset",
+        "hierarchy_level": "chr",
+        "from_pipeline": "ani",
+        "base_name": "LHSN_s310_c0990_ani_ani_v002-chr_dwl_01",
+        "import_type": "reference",
+        "outputs": [
+            "p:/LHSN/publish/shot/s310/c0990/element/ani/ani/cache/v002/LHSN_s310_c0990_ani_ani_v002-chr_dwl_01.abc"
+        ],
+        "project_db": "proj_lhsn",
+        "project_name": "rig",
+        "version": "v002",
+        "translate": ""
+    },
+    {
+        "asset_name": "tna",
+        "asset_type": "chr",
+        "asset_task_name": "rig",
+        "asset_pipeline_name": "rig",
+        "asset_type_group_name": "element",
+        "asset_source": "p:/LHSN/publish/asset/chr/tna/element/rig/rig/LHSN_chr_tna_rig_rig_v024.ma",
+        "asset_version": "v024",
+        "asset_task_module": "asset",
+        "hierarchy_level": "chr",
+        "from_pipeline": "ani",
+        "base_name": "LHSN_s310_c0990_ani_ani_v002-chr_tna_01",
+        "import_type": "reference",
+        "outputs": [
+            "p:/LHSN/publish/shot/s310/c0990/element/ani/ani/cache/v002/LHSN_s310_c0990_ani_ani_v002-chr_tna_01.abc"
+        ],
+        "project_db": "proj_lhsn",
+        "project_name": "rig",
+        "version": "v002",
+        "translate": ""
+    },
+    {
+        "asset_name": "css_bta",
+        "asset_type": "set",
+        "asset_task_name": "mod",
+        "asset_pipeline_name": "mod",
+        "asset_type_group_name": "element",
+        "asset_source": "p:/LHSN/publish/asset/set/css_bta/element/mod/mod/LHSN_set_css_bta_mod_mod_v019.ma",
+        "asset_version": "v019",
+        "asset_task_module": "asset",
+        "hierarchy_level": "env",
+        "from_pipeline": "ani",
+        "base_name": "LHSN_s310_c0990_ani_ani_v002-set_css_bta_01",
+        "import_type": "reference",
+        "outputs": [
+            "p:/LHSN/publish/shot/s310/c0990/element/ani/ani/cache/v002/LHSN_s310_c0990_ani_ani_v002-set_css_bta_01.ma"
+        ],
+        "project_db": "proj_lhsn",
+        "project_name": "mod",
+        "version": "v002",
+        "translate": ""
+    },
+    {
+        "asset_name": "syz_she02",
+        "asset_type": "prp",
+        "asset_task_name": "rig_a",
+        "asset_pipeline_name": "rig",
+        "asset_type_group_name": "element",
+        "asset_source": "P:/LHSN/publish/asset/prp/syz_she02/element/rig/rig_a/LHSN_prp_syz_she02_rig_rig_a_v001.ma",
+        "asset_version": "v001",
+        "asset_task_module": "asset",
+        "hierarchy_level": "prp",
+        "from_pipeline": "ani",
+        "base_name": "LHSN_s310_c0990_ani_ani_v002-prp_syz_she02_01",
+        "import_type": "reference",
+        "outputs": [
+            "p:/LHSN/publish/shot/s310/c0990/element/ani/ani/cache/v002/LHSN_s310_c0990_ani_ani_v002-prp_syz_she02_01.abc"
+        ],
+        "project_db": "proj_lhsn",
+        "project_name": "rig",
+        "version": "v002",
+        "translate": ""
+    }
+]

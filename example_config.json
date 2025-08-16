@@ -1,0 +1,49 @@
+[
+    {
+        "asset_name": "dwl",
+        "asset_type": "chr",
+        "asset_type_group_name": "character",
+        "description": "角色：动物狼",
+        "outputs": [
+            "P:\\LHSN\\publish\\shot\\s310\\c0990\\element\\ani\\ani\\cache\\v002\\LHSN_s310_c0990_ani_ani_v002-chr_dwl_01.abc",
+            "P:\\LHSN\\publish\\shot\\s310\\c0990\\element\\ani\\ani\\cache\\v002\\LHSN_s310_c0990_ani_ani_v002-chr_dwl_02.abc"
+        ]
+    },
+    {
+        "asset_name": "zmz",
+        "asset_type": "chr", 
+        "asset_type_group_name": "character",
+        "description": "角色：主角",
+        "outputs": [
+            "P:\\LHSN\\publish\\shot\\s310\\c0990\\element\\ani\\ani\\cache\\v002\\LHSN_s310_c0990_ani_ani_v002-chr_zmz_01.abc"
+        ]
+    },
+    {
+        "asset_name": "sword01",
+        "asset_type": "prop",
+        "asset_type_group_name": "weapon",
+        "description": "道具：剑",
+        "outputs": [
+            "P:\\LHSN\\publish\\shot\\s310\\c0990\\element\\ani\\ani\\cache\\v002\\LHSN_s310_c0990_ani_ani_v002-prop_sword01_01.abc"
+        ]
+    },
+    {
+        "asset_name": "table01",
+        "asset_type": "prop",
+        "asset_type_group_name": "furniture",
+        "description": "道具：桌子",
+        "outputs": [
+            "P:\\LHSN\\publish\\shot\\s310\\c0990\\element\\ani\\ani\\cache\\v002\\LHSN_s310_c0990_ani_ani_v002-prop_table01_01.abc",
+            "P:\\LHSN\\publish\\shot\\s310\\c0990\\element\\ani\\ani\\cache\\v002\\LHSN_s310_c0990_ani_ani_v002-prop_table01_02.abc"
+        ]
+    },
+    {
+        "asset_name": "tree01",
+        "asset_type": "env",
+        "asset_type_group_name": "vegetation",
+        "description": "环境：树木",
+        "outputs": [
+            "P:\\LHSN\\publish\\shot\\s310\\c0990\\element\\ani\\ani\\cache\\v002\\LHSN_s310_c0990_ani_ani_v002-env_tree01_01.abc"
+        ]
+    }
+]
