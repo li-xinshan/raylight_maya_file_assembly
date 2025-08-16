@@ -258,13 +258,19 @@ class CoreAssembler:
                     
                     if success and new_transforms:
                         # 连接到lookdev
-                        if self.abc_importer.connect_abc_to_lookdev(
+                        connection_result = self.abc_importer.connect_abc_to_lookdev(
                             new_transforms, abc_node, self.lookdev_meshes, self.lookdev_namespace
-                        ):
+                        )
+                        
+                        if connection_result:
                             connected_count += 1
                             
                             # 自动匹配解算BlendShapes（如果有的话）
-                            self._auto_match_simulation_blendshapes(new_transforms, self.animation_namespace)
+                            # 获取实际导入的ABC mesh transforms
+                            abc_meshes = self.abc_importer._find_abc_meshes(new_transforms, abc_node)
+                            if abc_meshes:
+                                abc_mesh_transforms = [info['transform'] for info in abc_meshes.values()]
+                                self._auto_match_simulation_blendshapes(abc_mesh_transforms, self.animation_namespace)
                             
                 except Exception as e:
                     print(f"处理动画文件失败 {animation_file}: {str(e)}")
