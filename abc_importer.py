@@ -237,9 +237,18 @@ class ABCImporter:
             print(f"ABC节点: {abc_node}")
             print(f"新对象列表: {new_transforms}")
             
+            # 递归查找所有mesh对象，不只是顶层对象
+            all_mesh_transforms = []
             for transform in new_transforms:
+                # 递归查找当前对象及其所有子对象中的mesh
+                mesh_transforms = self._find_mesh_transforms_recursive(transform)
+                all_mesh_transforms.extend(mesh_transforms)
+            
+            print(f"递归查找到 {len(all_mesh_transforms)} 个mesh对象")
+            
+            for transform in all_mesh_transforms:
                 try:
-                    print(f"  检查对象: {transform}")
+                    print(f"  检查mesh对象: {transform}")
                     
                     # 获取mesh shape
                     mesh_shapes = cmds.listRelatives(transform, shapes=True, type='mesh', fullPath=True)
@@ -292,6 +301,29 @@ class ABCImporter:
         except Exception as e:
             print(f"查找ABC meshes失败: {str(e)}")
             return {}
+    
+    def _find_mesh_transforms_recursive(self, transform):
+        """递归查找mesh对象"""
+        mesh_transforms = []
+        
+        try:
+            # 检查当前对象是否有mesh shape
+            if cmds.objExists(transform):
+                mesh_shapes = cmds.listRelatives(transform, shapes=True, type='mesh', fullPath=True)
+                if mesh_shapes:
+                    mesh_transforms.append(transform)
+                
+                # 递归检查所有子对象
+                children = cmds.listRelatives(transform, children=True, type='transform', fullPath=True)
+                if children:
+                    for child in children:
+                        child_meshes = self._find_mesh_transforms_recursive(child)
+                        mesh_transforms.extend(child_meshes)
+        
+        except Exception as e:
+            print(f"递归查找mesh失败 {transform}: {str(e)}")
+        
+        return mesh_transforms
     
     def _connect_meshes(self, abc_meshes, lookdev_meshes, lookdev_namespace):
         """连接ABC和Lookdev meshes"""
