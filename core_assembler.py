@@ -1913,32 +1913,42 @@ class CoreAssembler:
             created_blendshapes = []
             
             print(f"  分析CFX组: {cfx_group.split('|')[-1]}")
-            # 获取CFX组下所有mesh并统计面数
+            # 获取CFX组下所有mesh并统计面数（过滤掉Orig和中间形状）
             cfx_meshes = cmds.listRelatives(cfx_group, allDescendents=True, children=True, fullPath=True, type='mesh') or []
             for cfx_mesh in cfx_meshes:
                 try:
+                    # 跳过中间形状和Orig形状
+                    mesh_name = cfx_mesh.split('|')[-1]
+                    if 'Orig' in mesh_name or cmds.getAttr(f"{cfx_mesh}.intermediateObject"):
+                        continue
+                        
                     face_count = cmds.polyEvaluate(cfx_mesh, face=True)
-                    mesh_name = self._clean_mesh_name(cfx_mesh.split('|')[-1])
+                    clean_name = self._clean_mesh_name(mesh_name)
                     cfx_mesh_info[cfx_mesh] = {
                         'face_count': face_count,
-                        'clean_name': mesh_name
+                        'clean_name': clean_name
                     }
-                    print(f"    CFX: {cfx_mesh.split('|')[-1]} - {face_count} 面 ({mesh_name})")
+                    print(f"    CFX: {mesh_name} - {face_count} 面 ({clean_name})")
                 except:
                     continue
             
             print(f"  分析ANI组: {ani_group.split('|')[-1]}")
-            # 获取ANI组下所有mesh并统计面数
+            # 获取ANI组下所有mesh并统计面数（过滤掉Orig和中间形状）
             ani_meshes = cmds.listRelatives(ani_group, allDescendents=True, children=True, fullPath=True, type='mesh') or []
             for ani_mesh in ani_meshes:
                 try:
+                    # 跳过中间形状和Orig形状
+                    mesh_name = ani_mesh.split('|')[-1]
+                    if 'Orig' in mesh_name or cmds.getAttr(f"{ani_mesh}.intermediateObject"):
+                        continue
+                        
                     face_count = cmds.polyEvaluate(ani_mesh, face=True)
-                    mesh_name = self._clean_mesh_name(ani_mesh.split('|')[-1])
+                    clean_name = self._clean_mesh_name(mesh_name)
                     ani_mesh_info[ani_mesh] = {
                         'face_count': face_count,
-                        'clean_name': mesh_name
+                        'clean_name': clean_name
                     }
-                    print(f"    ANI: {ani_mesh.split('|')[-1]} - {face_count} 面 ({mesh_name})")
+                    print(f"    ANI: {mesh_name} - {face_count} 面 ({clean_name})")
                 except:
                     continue
             
