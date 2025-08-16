@@ -344,20 +344,21 @@ class LookdevFinder:
             matching_files = self._filter_matching_files(lookdev_files, asset_name, asset_type)
             
             if matching_files:
-                # 获取最新版本
+                # 直接从匹配的文件中获取最新版本，而不是重新扫描
+                # 因为lookdev_files已经按版本降序排列，匹配文件中的第一个就是最新的
+                latest_file = matching_files[0]
+                print(f"✅ 找到Lookdev文件: {os.path.basename(latest_file)} (最新版本)")
+                return latest_file
+            else:
+                # 如果没有匹配的文件，使用默认的最新版本
+                print(f"⚠️  未找到完全匹配的文件，使用默认最新版本")
                 latest_file = self.file_manager.get_latest_lookdev_file(lookdev_dir)
-                
-                if latest_file in matching_files:
-                    print(f"✅ 找到Lookdev文件: {os.path.basename(latest_file)}")
+                if latest_file:
+                    print(f"✅ 找到Lookdev文件: {os.path.basename(latest_file)} (默认最新版本)")
                     return latest_file
                 else:
-                    # 使用匹配度最高的文件
-                    best_file = matching_files[0]
-                    print(f"✅ 找到Lookdev文件: {os.path.basename(best_file)}")
-                    return best_file
-            else:
-                print(f"❌ 未找到匹配的Lookdev文件")
-                return None
+                    print(f"❌ 未找到任何Lookdev文件")
+                    return None
                 
         except Exception as e:
             print(f"❌ 查找Lookdev文件失败: {str(e)}")
@@ -367,8 +368,16 @@ class LookdevFinder:
         """过滤匹配的文件"""
         matching_files = []
         
-        for file_path in lookdev_files:
-            filename = os.path.basename(file_path)
+        for file_info in lookdev_files:
+            # 处理字典格式的文件信息
+            if isinstance(file_info, dict):
+                file_path = file_info.get('path', '')
+                filename = file_info.get('filename', os.path.basename(file_path))
+            else:
+                # 兼容字符串格式
+                file_path = file_info
+                filename = os.path.basename(file_path)
+            
             filename_lower = filename.lower()
             
             # 检查是否包含资产名称
