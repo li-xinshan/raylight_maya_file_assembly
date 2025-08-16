@@ -33,7 +33,7 @@ class ConfigManager:
         
         # 项目扫描配置
         self.project_scan_config = {
-            'scan_drives': ['P:', 'Q:', 'R:'],  # 要扫描的盘符
+            'scan_paths': ['P:/LHSN'],  # 只扫描P盘LHSN目录
             'shot_pattern': r'shot[/\\](s\d+)[/\\](c\d+)',  # 场次和镜头匹配模式
             'animation_path_pattern': r'.*[/\\]element[/\\]ani[/\\]ani[/\\]cache[/\\](v\d+)[/\\].*\.abc$',  # 动画文件路径模式
             'max_workers': 4,  # 线程池大小
@@ -286,13 +286,13 @@ class ConfigManager:
         print("🔍 开始多线程扫描项目动画文件...")
         start_time = time.time()
         
-        # 获取可用盘符
-        available_drives = self._get_available_drives()
-        if not available_drives:
-            print("❌ 没有找到可用的扫描盘符")
+        # 获取可用扫描路径
+        available_paths = self._get_available_drives()
+        if not available_paths:
+            print("❌ 没有找到可用的扫描路径")
             return {}
         
-        print(f"🎯 发现可用盘符: {available_drives}")
+        print(f"🎯 发现可用扫描路径: {available_paths}")
         
         # 使用线程池扫描
         max_workers = self.project_scan_config['max_workers']
@@ -301,40 +301,40 @@ class ConfigManager:
         
         with ThreadPoolExecutor(max_workers=max_workers) as executor:
             # 提交扫描任务
-            future_to_drive = {
-                executor.submit(self._scan_single_drive, drive, progress_callback): drive 
-                for drive in available_drives
+            future_to_path = {
+                executor.submit(self._scan_single_drive, path, progress_callback): path 
+                for path in available_paths
             }
             
             completed = 0
-            for future in as_completed(future_to_drive):
-                drive = future_to_drive[future]
+            for future in as_completed(future_to_path):
+                path = future_to_path[future]
                 completed += 1
                 
                 try:
-                    drive_result = future.result()
-                    if drive_result:
-                        drive_shot_data, drive_files_count = drive_result
+                    path_result = future.result()
+                    if path_result:
+                        path_shot_data, path_files_count = path_result
                         
                         # 合并结果
-                        for shot_key, shot_data in drive_shot_data.items():
+                        for shot_key, shot_data in path_shot_data.items():
                             if shot_key not in all_shot_data:
                                 all_shot_data[shot_key] = shot_data
                             else:
                                 # 合并同一镜头的数据
                                 all_shot_data[shot_key] = self._merge_shot_data(all_shot_data[shot_key], shot_data)
                         
-                        total_files += drive_files_count
-                        print(f"  ✅ 完成盘符 {drive}: {drive_files_count} 个文件")
+                        total_files += path_files_count
+                        print(f"  ✅ 完成路径 {path}: {path_files_count} 个文件")
                     else:
-                        print(f"  ❌ 盘符 {drive} 扫描失败")
+                        print(f"  ❌ 路径 {path} 扫描失败")
                         
                 except Exception as e:
-                    print(f"  ❌ 盘符 {drive} 扫描异常: {str(e)}")
+                    print(f"  ❌ 路径 {path} 扫描异常: {str(e)}")
                 
                 # 更新进度
                 if progress_callback:
-                    progress_callback(completed, len(available_drives), f"已完成 {completed}/{len(available_drives)} 个盘符扫描")
+                    progress_callback(completed, len(available_paths), f"已完成 {completed}/{len(available_paths)} 个路径扫描")
         
         # 后处理：版本过滤和资产完整性验证
         print("🔧 开始后处理...")
@@ -484,17 +484,17 @@ class ConfigManager:
             return shot_data
     
     def _get_available_drives(self):
-        """获取可用的扫描盘符"""
-        available_drives = []
-        for drive in self.project_scan_config['scan_drives']:
-            if os.path.exists(drive + '\\'):
-                available_drives.append(drive)
-        return available_drives
+        """获取可用的扫描路径"""
+        available_paths = []
+        for path in self.project_scan_config['scan_paths']:
+            if os.path.exists(path):
+                available_paths.append(path)
+        return available_paths
     
-    def _scan_single_drive(self, drive, progress_callback=None):
-        """扫描单个盘符"""
+    def _scan_single_drive(self, scan_path, progress_callback=None):
+        """扫描单个路径"""
         try:
-            print(f"  🔍 开始扫描盘符: {drive}")
+            print(f"  🔍 开始扫描路径: {scan_path}")
             
             shot_data = {}
             files_count = 0
@@ -504,7 +504,8 @@ class ConfigManager:
             animation_pattern = re.compile(self.project_scan_config['animation_path_pattern'])
             
             # 扫描publish目录结构
-            publish_pattern = os.path.join(drive, '*', 'publish', 'shot', '*', '*', 'element', 'ani', 'ani', 'cache', '*', '*.abc')
+            # 从P:/LHSN路径开始扫描，直接查找publish/shot路径
+            publish_pattern = os.path.join(scan_path, 'publish', 'shot', '*', '*', 'element', 'ani', 'ani', 'cache', '*', '*.abc')
             
             abc_files = glob.glob(publish_pattern)
             
@@ -567,7 +568,7 @@ class ConfigManager:
             return shot_data, files_count
             
         except Exception as e:
-            print(f"    ❌ 扫描盘符 {drive} 失败: {str(e)}")
+            print(f"    ❌ 扫描路径 {scan_path} 失败: {str(e)}")
             return None
     
     def _merge_shot_data(self, data1, data2):
