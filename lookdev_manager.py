@@ -45,15 +45,14 @@ class LookdevManager:
             # 导入文件
             cmds.file(
                 lookdev_file,
-                i=True,
+                r=True,  # Reference
                 type="mayaAscii",
                 ignoreVersion=True,
-                ra=True,
+                prompt=False,
                 mergeNamespacesOnClash=False,
                 namespace=namespace,
-                pr=True,
-                force=True,
-                prompt=False,
+                loadReferenceDepth="all",  # 加载所有引用层级
+                returnNewNodes=True  # 返回新节点
             )
             
             # 记录导入的节点

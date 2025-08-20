@@ -79,15 +79,6 @@ class BlendshapeManager:
                 used_drv_shapes.add(drv_best)
                 continue
 
-            # 参考只读检查：目标若只读，则无法添加变形器
-            try:
-                if mc.referenceQuery(t_x_valid, isNodeReferenced=True):
-                    print("  跳过（目标为参考只读）:", self._short(t_x_valid))
-                    used_drv_shapes.add(drv_best)
-                    continue
-            except Exception:
-                pass
-
             # 创建 blendShape：源 d_x_valid，目标 t_x_valid
             try:
                 bs_name = 'bs_' + self._no_ns(self._short(t_x_valid))

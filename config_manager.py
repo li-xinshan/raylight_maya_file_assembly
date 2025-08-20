@@ -33,11 +33,11 @@ class ConfigManager:
         
         # 项目扫描配置
         self.project_scan_config = {
-            'scan_drives': ['P:', 'Q:', 'R:'],  # 要扫描的盘符
+            'scan_drives': ['P:'],  # 要扫描的盘符
             'shot_pattern': r'shot[/\\](s\d+)[/\\](c\d+)',  # 场次和镜头匹配模式
             'animation_path_pattern': r'.*[/\\]element[/\\]ani[/\\]ani[/\\]cache[/\\](v\d+)[/\\].*\.(abc|ma)$',  # 动画文件路径模式
             'cfx_path_pattern': r'.*[/\\]cfx[/\\]alembic[/\\](hair|cloth)[/\\].*\.(abc|ma)$',  # CFX文件路径模式
-            'max_workers': 4,  # 线程池大小
+            'max_workers': 16,  # 线程池大小
             'required_assets': ['chr', 'set', 'prp', 'env', 'prop'],  # 必需的资产类型（包含所有资产类型）
             'min_assets_per_shot': 1  # 每个镜头最少资产数量
         }
