@@ -11,7 +11,20 @@
 - **智能文件查找**: 自动查找最新版本的Lookdev文件
 - **相机路径推导**: 从动画文件路径智能推导相机文件路径
 - **模块化架构**: 分离关注点，便于维护和扩展
+- **专业管理器**: 各功能模块独立管理，职责清晰
 - **版本管理**: 自动处理文件版本选择
+
+### v2.0 架构重构
+- **UI层重构**: maya_assembler.py 从1451行精简至306行 (减少78.9%)
+- **UI模块化**: 分离为组件创建、事件处理、工具函数三个模块
+- **核心组装器**: core_assembler.py 从4000+行精简至304行 (减少92%)
+- **专业管理器**:
+  - `abc_importer.py`: ABC文件导入和连接
+  - `blendshape_manager.py`: BlendShape变形管理
+  - `scene_manager.py`: 场景设置和优化
+  - `material_manager.py`: 材质检查和修复
+  - `xgen_manager.py`: XGen毛发缓存管理
+- **工具模块**: 配置、文件、路径工具模块
 
 ### 核心功能
 1. 自动导入Lookdev文件
@@ -25,15 +38,28 @@
 
 ```
 raylight_maya_file_assembly/
-├── maya_assembler_v2.py        # 主插件文件（v2.0）
-├── maya_assembler.py           # 原始插件文件
-├── maya_assembler_v1_backup.py # v1.1备份
-├── core_assembler.py           # 核心组装器
+├── maya_assembler.py           # 精简UI主文件（306行，减少78.9%）
+├── ui_components.py            # UI组件创建模块（282行）
+├── ui_event_handlers.py        # UI事件处理模块（705行）
+├── ui_utils.py                 # UI工具函数模块（405行）
+├── core_assembler.py           # 精简核心组装器（304行）
+├── assembly_coordinator.py    # 组装协调器（管理执行流程）
+├── lookdev_manager.py          # Lookdev文件管理
+├── animation_manager.py        # 动画连接管理
+├── abc_importer.py            # ABC导入管理模块
+├── blendshape_manager.py      # BlendShape管理模块
+├── scene_manager.py           # 场景管理模块
+├── material_manager.py        # 材质管理模块
+├── xgen_manager.py            # XGen管理模块
 ├── config_manager.py           # 配置管理模块
 ├── file_manager.py             # 文件管理模块
 ├── path_utils.py              # 路径工具模块
 ├── example_config.json        # 示例配置文件
-├── test_new_system.py         # 测试脚本
+├── link_asset.json            # 详细资产配置示例
+├── test_refactored_system.py  # 重构后系统测试脚本
+├── core_assembler_old.py      # 原4000+行版本备份
+├── maya_assembler_old.py      # 原1451行UI版本备份
+├── dev.py                     # v1.1版本备份
 └── README.md                  # 本文档
 ```
 
@@ -252,12 +278,14 @@ python test_new_system.py
 
 ## 更新记录
 
-### v2.0
-- 全新模块化架构
-- JSON配置系统
-- 智能文件查找
-- 相机路径推导
-- 改进的UI和用户体验
+### v2.0 (完全重构版)
+- **代码大幅精简**: 主要模块减少80%+代码量
+- **UI模块化重构**: maya_assembler.py (1451行→306行)
+- **核心模块化重构**: core_assembler.py (4000+行→304行)
+- **职责分离**: UI组件、事件处理、工具函数独立模块
+- **JSON配置系统**: 支持多资产批量处理
+- **智能文件查找**: 自动定位最新版本文件
+- **相机路径推导**: 智能推导相机文件路径
 
 ### v1.1
 - 基础的Lookdev动画组装功能

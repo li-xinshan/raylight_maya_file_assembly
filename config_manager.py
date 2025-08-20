@@ -35,9 +35,10 @@ class ConfigManager:
         self.project_scan_config = {
             'scan_drives': ['P:', 'Q:', 'R:'],  # 要扫描的盘符
             'shot_pattern': r'shot[/\\](s\d+)[/\\](c\d+)',  # 场次和镜头匹配模式
-            'animation_path_pattern': r'.*[/\\]element[/\\]ani[/\\]ani[/\\]cache[/\\](v\d+)[/\\].*\.abc$',  # 动画文件路径模式
+            'animation_path_pattern': r'.*[/\\]element[/\\]ani[/\\]ani[/\\]cache[/\\](v\d+)[/\\].*\.(abc|ma)$',  # 动画文件路径模式
+            'cfx_path_pattern': r'.*[/\\]cfx[/\\]alembic[/\\](hair|cloth)[/\\].*\.(abc|ma)$',  # CFX文件路径模式
             'max_workers': 4,  # 线程池大小
-            'required_assets': ['chr', 'set', 'prp', 'env'],  # 必需的资产类型（包含所有资产类型）
+            'required_assets': ['chr', 'set', 'prp', 'env', 'prop'],  # 必需的资产类型（包含所有资产类型）
             'min_assets_per_shot': 1  # 每个镜头最少资产数量
         }
         
@@ -502,23 +503,33 @@ class ConfigManager:
             # 编译正则表达式
             shot_pattern = re.compile(self.project_scan_config['shot_pattern'])
             animation_pattern = re.compile(self.project_scan_config['animation_path_pattern'])
+            cfx_pattern = re.compile(self.project_scan_config['cfx_path_pattern'])
             
-            # 扫描publish目录结构
+            # 扫描publish目录结构 - 动画文件
             publish_pattern = os.path.join(drive, '*', 'publish', 'shot', '*', '*', 'element', 'ani', 'ani', 'cache', '*', '*.abc')
-            
             abc_files = glob.glob(publish_pattern)
             
-            for abc_file in abc_files:
+            # 扫描cache目录结构 - CFX文件
+            cfx_pattern_path = os.path.join(drive, '*', 'cache', 'dcc', 'shot', '*', '*', 'cfx', 'alembic', '*', '*', '*.abc')
+            cfx_files = glob.glob(cfx_pattern_path)
+            
+            # 合并所有文件
+            all_files = abc_files + cfx_files
+            
+            for file_path in all_files:
                 # 标准化路径
-                normalized_path = abc_file.replace('\\', '/')
+                normalized_path = file_path.replace('\\', '/')
                 
                 # 匹配场次和镜头
                 shot_match = shot_pattern.search(normalized_path)
                 if not shot_match:
                     continue
-                    
-                # 验证是否是动画文件
-                if not animation_pattern.match(abc_file):
+                
+                # 判断文件类型 - 动画文件或CFX文件
+                is_animation = animation_pattern.match(file_path)
+                is_cfx = cfx_pattern.match(file_path)
+                
+                if not is_animation and not is_cfx:
                     continue
                 
                 sequence = shot_match.group(1)  # s310
@@ -526,16 +537,36 @@ class ConfigManager:
                 shot_key = f"{sequence}_{shot}"
                 
                 # 提取版本信息
-                version_match = re.search(r'[/\\](v\d+)[/\\]', normalized_path)
-                version = version_match.group(1) if version_match else 'unknown'
+                if is_animation:
+                    version_match = re.search(r'[/\\](v\d+)[/\\]', normalized_path)
+                    version = version_match.group(1) if version_match else 'unknown'
+                else:  # CFX文件可能没有版本号，使用默认
+                    version = 'v001'
                 
                 # 提取资产信息
-                filename = os.path.basename(abc_file)
-                asset_match = re.search(r'-(chr|prop|env)_(\w+)_(\d+)\.abc$', filename)
+                filename = os.path.basename(file_path)
                 
-                asset_type = asset_match.group(1) if asset_match else 'unknown'
-                asset_name = asset_match.group(2) if asset_match else 'unknown'
-                asset_index = asset_match.group(3) if asset_match else '01'
+                if is_animation:
+                    # 动画文件: LHSN_s310_c0990_ani_ani_v002-chr_dwl_01.abc
+                    asset_match = re.search(r'-(chr|prop|env|set|prp)_(\w+)_(\d+)\.(abc|ma)$', filename)
+                    asset_type = asset_match.group(1) if asset_match else 'unknown'
+                    asset_name = asset_match.group(2) if asset_match else 'unknown'  
+                    asset_index = asset_match.group(3) if asset_match else '01'
+                elif is_cfx:
+                    # CFX文件: cache_dwl_01.abc 或类似格式
+                    # 从路径中提取资产信息: /cfx/alembic/hair/dwl_01/
+                    cfx_type_match = re.search(r'[/\\]cfx[/\\]alembic[/\\](hair|cloth)[/\\]', normalized_path)
+                    cfx_asset_match = re.search(r'[/\\](chr_|)(\w+)_(\d+)[/\\]', normalized_path)
+                    
+                    if cfx_type_match and cfx_asset_match:
+                        cfx_type = cfx_type_match.group(1)  # hair or cloth
+                        asset_type = 'chr'  # CFX通常用于角色
+                        asset_name = cfx_asset_match.group(2)  # dwl
+                        asset_index = cfx_asset_match.group(3)  # 01
+                    else:
+                        asset_type = 'cfx'
+                        asset_name = 'unknown'
+                        asset_index = '01'
                 
                 # 组织数据
                 if shot_key not in shot_data:
@@ -550,14 +581,19 @@ class ConfigManager:
                 
                 # 添加文件信息
                 file_info = {
-                    'path': abc_file,
+                    'path': file_path,
                     'filename': filename,
                     'asset_type': asset_type,
                     'asset_name': asset_name,
                     'asset_index': asset_index,
                     'version': version,
-                    'size': os.path.getsize(abc_file) if os.path.exists(abc_file) else 0
+                    'file_type': 'cfx' if is_cfx else 'animation',
+                    'size': os.path.getsize(file_path) if os.path.exists(file_path) else 0
                 }
+                
+                # 为CFX文件添加额外信息
+                if is_cfx and 'cfx_type' in locals():
+                    file_info['cfx_type'] = cfx_type  # hair 或 cloth
                 
                 shot_data[shot_key]['animation_files'].append(file_info)
                 shot_data[shot_key]['assets'].add(f"{asset_type}_{asset_name}")

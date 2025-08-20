@@ -4,14 +4,16 @@ ABC导入管理模块
 """
 
 import maya.cmds as cmds
+import maya.mel as mel
 import os
 import re
-
+from blendshape_manager import BlendshapeManager
 
 class ABCImporter:
     """ABC导入管理器"""
     
     def __init__(self):
+        self.blendshape_manager = BlendshapeManager()
         self.imported_abc_nodes = []
         self.pending_abc_files = []  # 待连接的ABC文件
         self.time_range = [1, 100]  # 默认时间范围
@@ -49,6 +51,329 @@ class ABCImporter:
             print(f"❌ 导入ABC文件失败: {str(e)}")
             return False, [], None
     
+    def _import_abc_file(self, abc_file, namespace):
+        """导入ABC文件的具体实现"""
+        try:
+            # 确保ABC插件已加载
+            if not cmds.pluginInfo('AbcImport', query=True, loaded=True):
+                cmds.loadPlugin('AbcImport')
+            
+            # 记录导入前的节点状态
+            transforms_before = set(cmds.ls(type='transform'))
+            abc_nodes_before = set(cmds.ls(type="AlembicNode"))
+            
+            # 导入ABC文件
+            mel.eval(f'AbcImport -mode import "{abc_file}"')
+            
+            # 查找新导入的节点
+            transforms_after = set(cmds.ls(type='transform'))
+            abc_nodes_after = set(cmds.ls(type="AlembicNode"))
+            
+            new_transforms = list(transforms_after - transforms_before)
+            new_abc_nodes = list(abc_nodes_after - abc_nodes_before)
+            
+            abc_node = new_abc_nodes[0] if new_abc_nodes else None
+            
+            print(f"✅ ABC文件导入成功: {len(new_transforms)} 个transform, {len(new_abc_nodes)} 个ABC节点")
+            
+            return True, new_transforms, abc_node
+            
+        except Exception as e:
+            print(f"❌ 导入ABC文件失败: {str(e)}")
+            return False, [], None
+    
+    def _import_ma_file(self, ma_file, namespace):
+        """导入Maya文件的具体实现"""
+        try:
+            # 记录导入前的节点状态
+            transforms_before = set(cmds.ls(type='transform'))
+            
+            # 导入Maya文件
+            cmds.file(
+                ma_file,
+                i=True,
+                type="mayaAscii",
+                ignoreVersion=True,
+                ra=True,
+                mergeNamespacesOnClash=False,
+                namespace=namespace if namespace else "",
+                pr=True
+            )
+            
+            # 查找新导入的节点
+            transforms_after = set(cmds.ls(type='transform'))
+            new_transforms = list(transforms_after - transforms_before)
+            
+            print(f"✅ Maya文件导入成功: {len(new_transforms)} 个transform")
+            
+            return True, new_transforms, None
+            
+        except Exception as e:
+            print(f"❌ 导入Maya文件失败: {str(e)}")
+            return False, [], None
+
+    def _connect_to_lookdev_meshes(self, animation_namespace, lookdev_namespace):
+        """连接ABC几何体到lookdev几何体"""
+        try:
+            print("连接ABC几何体到lookdev几何体...")
+
+            lookdev_geo = f'|{lookdev_namespace}:Master|{lookdev_namespace}:GEO'
+            animation_geo = f'|{animation_namespace}:GEO'
+
+            print(f"动画几何体: {animation_geo}")
+            print(f"Lookdev几何体: {lookdev_geo}")
+
+            # 检查节点是否存在
+            if not cmds.objExists(animation_geo):
+                print(f"❌ 动画几何体不存在: {animation_geo}")
+                return False
+
+            if not cmds.objExists(lookdev_geo):
+                print(f"❌ Lookdev几何体不存在: {lookdev_geo}")
+                return False
+
+            # 执行blendshape连接
+            result = self.blendshape_manager.create_precise_blendshapes_between_groups(
+                animation_geo, lookdev_geo
+            )
+            print(f"连接完成: {len(result)} 个几何体")
+
+            # 隐藏动画组 - 改进的版本
+            try:
+                print(f'准备隐藏动画组：{animation_geo}')
+
+                # 方法1：直接使用完整路径
+                if cmds.objExists(animation_geo):
+                    cmds.setAttr(f"{animation_geo}.visibility", 0)
+                    print(f"✅ 成功隐藏动画组（完整路径）: {animation_geo}")
+                else:
+                    # 方法2：尝试使用短名称
+                    short_name = animation_geo.split('|')[-1]
+                    print(f"尝试使用短名称: {short_name}")
+
+                    if cmds.objExists(short_name):
+                        cmds.setAttr(f"{short_name}.visibility", 0)
+                        print(f"✅ 成功隐藏动画组（短名称）: {short_name}")
+                    else:
+                        print(f"❌ 无法找到节点进行隐藏: {animation_geo}")
+
+            except Exception as hide_error:
+                print(f"❌ 隐藏动画组失败: {str(hide_error)}")
+                # 不让隐藏失败影响整个流程
+                pass
+
+            return len(result) > 0
+
+        except Exception as e:
+            print(f"❌ 连接ABC几何体失败: {str(e)}")
+            import traceback
+            print(f"详细错误信息: {traceback.format_exc()}")
+            return False
+    
+    def _find_best_match(self, abc_name, lookdev_names):
+        """查找最佳匹配的lookdev名称"""
+        abc_clean = self._clean_name(abc_name)
+        
+        # 直接匹配
+        for lookdev_name in lookdev_names:
+            lookdev_clean = self._clean_name(lookdev_name)
+            if abc_clean == lookdev_clean:
+                return lookdev_name
+        
+        # 部分匹配
+        for lookdev_name in lookdev_names:
+            lookdev_clean = self._clean_name(lookdev_name)
+            if abc_clean in lookdev_clean or lookdev_clean in abc_clean:
+                return lookdev_name
+        
+        return None
+    
+    def _clean_name(self, name):
+        """清理名称用于匹配"""
+        import re
+        name = name.lower()
+        # 移除常见前缀后缀和数字
+        name = re.sub(r'(chr_|dwl_|_grp|grp)', '', name)
+        name = re.sub(r'_?\d+$', '', name)
+        return name
+    
+    def _set_active_camera(self, camera_transform):
+        """设置活动相机"""
+        try:
+            panel = cmds.getPanel(withFocus=True)
+            if panel and cmds.modelPanel(panel, query=True, exists=True):
+                cmds.modelEditor(panel, edit=True, camera=camera_transform)
+                print(f"已设置活动相机: {camera_transform}")
+        except Exception as e:
+            print(f"设置活动相机失败: {str(e)}")
+    
+    def get_imported_abc_nodes(self):
+        """获取已导入的ABC节点列表"""
+        return self.imported_abc_nodes
+    
+    def clear_imported_nodes(self):
+        """清除已导入节点记录"""
+        self.imported_abc_nodes.clear()
+        self.pending_abc_files.clear()
+    
+    def import_and_connect_animations(self, animation_files, lookdev_namespace, animation_namespace):
+        """
+        批量导入动画文件并连接到lookdev几何体
+        
+        Args:
+            animation_files (list): 动画文件列表
+            lookdev_namespace (str): Lookdev命名空间
+            animation_namespace (str): 动画命名空间
+            
+        Returns:
+            bool: 是否成功
+        """
+        print(f"开始批量处理 {len(animation_files)} 个动画文件...")
+        success_count = 0
+        
+        for i, animation_file in enumerate(animation_files, 1):
+            print(f"\n处理动画文件 {i}/{len(animation_files)}: {os.path.basename(animation_file)}")
+            
+            # 导入单个动画文件
+            success, transforms, abc_node = self.import_single_animation_abc(animation_file, animation_namespace)
+            
+            if success:
+                success_count += 1
+                # 记录导入的节点
+                self.imported_abc_nodes.append(abc_node)
+                
+                # 连接到lookdev几何体
+                if transforms:
+                    self._connect_to_lookdev_meshes(animation_namespace, lookdev_namespace)
+
+            else:
+                print(f"❌ 动画文件 {i} 处理失败")
+        
+        overall_success = success_count > 0
+        print(f"\n{'✅' if overall_success else '❌'} 批量处理完成: {success_count}/{len(animation_files)} 个文件成功")
+        
+        return overall_success
+
+    def import_camera_abc(self, camera_file):
+        """
+        导入相机ABC文件
+
+        Args:
+            camera_file (str): 相机文件路径
+
+        Returns:
+            tuple: (success, start_frame, end_frame, abc_node)
+        """
+        try:
+            print(f"导入相机ABC: {os.path.basename(camera_file)}")
+
+            # 标准化路径分隔符
+            camera_file = camera_file.replace('\\', '/')
+
+            if not os.path.exists(camera_file):
+                print(f"❌ 相机文件不存在: {camera_file}")
+                # 尝试替换路径分隔符
+                alt_camera_file = camera_file.replace('/', '\\')
+                if os.path.exists(alt_camera_file):
+                    print(f"✅ 找到替代路径: {alt_camera_file}")
+                    camera_file = alt_camera_file
+                else:
+                    return False, None, None, None
+
+            # 确保ABC插件已加载
+            if not cmds.pluginInfo('AbcImport', query=True, loaded=True):
+                cmds.loadPlugin('AbcImport')
+
+            # 记录导入前的相机和ABC节点
+            cameras_before = set(cmds.ls(type="camera"))
+            abc_nodes_before = set(cmds.ls(type="AlembicNode"))
+
+            # 导入ABC文件 - 使用用户提供的标准方式
+            print(f"正在导入相机文件: {camera_file}")
+
+            # 确保路径格式正确 - 使用正斜杠
+            maya_path = camera_file.replace('\\', '/')
+
+            try:
+                cmds.file(
+                    maya_path,
+                    i=True,  # import
+                    type="Alembic",  # 文件类型
+                    ignoreVersion=True,  # 忽略版本
+                    ra=True,  # reference as
+                    mergeNamespacesOnClash=False,  # 不合并命名空间冲突
+                    pr=True,  # preserve references
+                    importTimeRange="combine"  # 导入时间范围
+                )
+                print("✅ 使用标准file命令导入ABC成功")
+
+            except Exception as file_error:
+                print(f"❌ file命令导入失败: {str(file_error)}")
+                # 备用方案：尝试cmds.AbcImport
+                try:
+                    cmds.AbcImport(maya_path, mode="import", fitTimeRange=True)
+                    print("✅ 使用AbcImport导入成功")
+                except Exception as abc_error:
+                    print(f"❌ AbcImport也失败: {str(abc_error)}")
+                    # 最后尝试MEL方式
+                    try:
+                        mel.eval(f'AbcImport -mode import "{maya_path}"')
+                        print("✅ 使用MEL方式导入成功")
+                    except Exception as mel_error:
+                        print(f"❌ 所有导入方式都失败: {str(mel_error)}")
+                        return False, None, None, None
+
+            # 查找新导入的ABC节点
+            abc_nodes_after = set(cmds.ls(type="AlembicNode"))
+            new_abc_nodes = abc_nodes_after - abc_nodes_before
+
+            if new_abc_nodes:
+                abc_node = list(new_abc_nodes)[0]
+
+                # 获取时间范围
+                start_frame = cmds.getAttr(f"{abc_node}.startFrame")
+                end_frame = cmds.getAttr(f"{abc_node}.endFrame")
+
+                # 设置Maya场景的时间范围
+                current_start = cmds.playbackOptions(query=True, minTime=True)
+                current_end = cmds.playbackOptions(query=True, maxTime=True)
+
+                print(f"当前场景帧范围: {current_start} - {current_end}")
+                print(f"ABC文件帧范围: {start_frame} - {end_frame}")
+
+                # 设置场景的时间范围为ABC的时间范围
+                cmds.playbackOptions(minTime=start_frame, maxTime=end_frame)
+
+                # 同时设置动画范围（时间轴的开始和结束）
+                cmds.playbackOptions(animationStartTime=start_frame, animationEndTime=end_frame)
+
+                # 设置当前帧为开始帧
+                cmds.currentTime(start_frame+10)
+
+                print(f"✅ 场景时间范围已设置为: {start_frame} - {end_frame}")
+
+                # 查找新导入的相机
+                cameras_after = set(cmds.ls(type="camera"))
+                new_cameras = cameras_after - cameras_before
+
+                if new_cameras:
+                    camera_shape = list(new_cameras)[0]
+                    camera_transform = cmds.listRelatives(camera_shape, parent=True, type="transform")[0]
+                    print(f"✅ 成功导入相机: {camera_transform}")
+
+                    # 设置为当前视图相机
+                    self._set_active_camera(camera_transform)
+
+                print(f"✅ 相机ABC导入成功，时间范围: {start_frame} - {end_frame}")
+                return True, start_frame, end_frame, abc_node
+            else:
+                print("❌ 未找到新的ABC节点")
+                return False, None, None, None
+
+        except Exception as e:
+            print(f"❌ 导入相机ABC失败: {str(e)}")
+            return False, None, None, None
+    
     def _import_abc_file(self, animation_file, namespace):
         """导入ABC文件"""
         try:
@@ -58,8 +383,26 @@ class ABCImporter:
             # 设置导入命名空间
             import_namespace = namespace or "animation"
             
-            # 导入ABC文件
-            cmds.AbcImport(animation_file, mode="import", fitTimeRange=True)
+            # 导入ABC文件 - 使用用户提供的标准方式
+            maya_path = animation_file.replace('\\', '/')
+            
+            try:
+                # 参考用户提供的标准ABC导入方式
+                cmds.file(
+                    maya_path,
+                    i=True,                          # import
+                    type="Alembic",                  # 文件类型
+                    ignoreVersion=True,              # 忽略版本
+                    ra=True,                         # reference as
+                    mergeNamespacesOnClash=False,    # 不合并命名空间冲突
+                    namespace=import_namespace,      # 命名空间
+                    pr=True,                         # preserve references
+                    importTimeRange="combine"        # 导入时间范围
+                )
+            except Exception as file_error:
+                print(f"❌ file命令导入失败: {str(file_error)}")
+                # 备用方案：使用原来的方法
+                cmds.AbcImport(maya_path, mode="import", fitTimeRange=True)
             
             # 查找新导入的对象
             objects_after = set(cmds.ls(assemblies=True))
@@ -119,51 +462,6 @@ class ABCImporter:
         except Exception as e:
             print(f"获取ABC时间范围失败: {str(e)}")
     
-    def import_camera_abc(self, camera_file):
-        """
-        导入相机ABC文件
-        
-        Args:
-            camera_file (str): 相机ABC文件路径
-            
-        Returns:
-            bool: 导入是否成功
-        """
-        try:
-            print(f"\n导入相机ABC: {os.path.basename(camera_file)}")
-            
-            if not os.path.exists(camera_file):
-                print(f"❌ 相机文件不存在: {camera_file}")
-                return False
-            
-            # 记录导入前的相机
-            cameras_before = set(cmds.ls(type='camera'))
-            
-            # 导入相机ABC
-            cmds.AbcImport(camera_file, mode="import", fitTimeRange=True)
-            
-            # 查找新导入的相机
-            cameras_after = set(cmds.ls(type='camera'))
-            new_cameras = cameras_after - cameras_before
-            
-            if new_cameras:
-                # 获取相机时间范围
-                self._get_time_range_from_imported_camera()
-                
-                print(f"✅ 相机ABC导入成功: {len(new_cameras)} 个相机")
-                
-                # 设置Maya时间范围
-                cmds.playbackOptions(min=self.time_range[0], max=self.time_range[1])
-                cmds.currentTime(self.time_range[0])
-                
-                return True
-            else:
-                print("⚠️  相机ABC导入但未找到新相机")
-                return False
-                
-        except Exception as e:
-            print(f"❌ 相机ABC导入失败: {str(e)}")
-            return False
     
     def _get_time_range_from_imported_camera(self):
         """从导入的相机获取时间范围"""
@@ -417,7 +715,8 @@ class ABCImporter:
             else:
                 # 创建新的blendShape
                 try:
-                    blend_node = cmds.blendShape(abc_info['transform'], lookdev_info['transform'])
+                    # 交换源和目标（lookdev驱动abc）
+                    blend_node = cmds.blendShape(lookdev_info['transform'], abc_info['transform'])
                     if blend_node:
                         cmds.setAttr(f"{blend_node[0]}.weight[0]", 1.0)
                         return True
@@ -447,13 +746,31 @@ class ABCImporter:
                 print(f"    blendShape节点没有可用输入槽")
                 return False
             
-            # 获取ABC的transform
-            abc_transform = cmds.listRelatives(abc_shape, parent=True, fullPath=True)[0]
-            lookdev_transform = cmds.listRelatives(lookdev_shape, parent=True, fullPath=True)[0]
+            # 获取ABC的transform（确保使用完整路径）
+            abc_transform = cmds.listRelatives(abc_shape, parent=True, fullPath=True)
+            if not abc_transform:
+                print(f"    无法获取ABC的transform节点")
+                return False
+            abc_transform = abc_transform[0]
             
-            # 添加blendShape目标
+            # 获取lookdev的transform（确保使用完整路径）
+            lookdev_transform = cmds.listRelatives(lookdev_shape, parent=True, fullPath=True)
+            if not lookdev_transform:
+                print(f"    无法获取lookdev的transform节点")
+                return False
+            lookdev_transform = lookdev_transform[0]
+            
+            # 获取非中间形状的shape节点
+            abc_shape_final = self._get_non_intermediate_shape(abc_transform)
+            lookdev_shape_final = self._get_non_intermediate_shape(lookdev_transform)
+            
+            if not abc_shape_final or not lookdev_shape_final:
+                print(f"    无法获取非中间形状节点")
+                return False
+            
+            # 添加blendShape目标 - 交换源和目标（lookdev驱动abc）
             cmds.blendShape(blendshape_node, edit=True, 
-                          target=(lookdev_transform, input_index, abc_transform, 1.0))
+                          target=(abc_transform, input_index, lookdev_transform, 1.0))
             
             # 设置权重为1
             cmds.setAttr(f"{blendshape_node}.weight[{input_index}]", 1.0)
@@ -461,8 +778,28 @@ class ABCImporter:
             return True
             
         except Exception as e:
-            print(f"    添加ABC blendShape目标失败: {str(e)}")
+            error_msg = str(e)
+            if "More than one object matches name" in error_msg:
+                print(f"    ❌ 名称冲突: {error_msg}")
+                print(f"    💡 建议: 检查场景中是否有重复的中间形状对象")
+                print(f"    💡 ABC: {abc_transform}")
+                print(f"    💡 Lookdev: {lookdev_transform}")
+            else:
+                print(f"    添加ABC blendShape目标失败: {error_msg}")
             return False
+    
+    def _get_non_intermediate_shape(self, transform):
+        """获取transform下的非中间形状节点"""
+        try:
+            shapes = cmds.listRelatives(transform, shapes=True, fullPath=True) or []
+            for shape in shapes:
+                # 检查是否是中间对象
+                if not cmds.getAttr(f"{shape}.intermediateObject"):
+                    return shape
+            return None
+        except Exception as e:
+            print(f"    获取非中间形状失败: {str(e)}")
+            return None
     
     def _find_available_blendshape_input(self, blendshape_node):
         """查找blendShape节点的可用输入槽"""

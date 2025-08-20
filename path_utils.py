@@ -6,7 +6,6 @@
 import os
 import re
 import glob
-from file_manager import FileManager
 
 
 class PathUtils:
@@ -14,8 +13,6 @@ class PathUtils:
     
     def __init__(self):
         """初始化路径工具"""
-        self.file_manager = FileManager()
-        
         # 常用的路径模式
         self.path_patterns = {
             'shot_animation': r'.*[/\\]shot[/\\](\w+)[/\\](\w+)[/\\]element[/\\]ani[/\\]ani[/\\]cache[/\\](v\d+)[/\\].*\.abc$',
@@ -371,60 +368,3 @@ class PathUtils:
                           len(result['errors']) == 0)
         
         return result
-    
-    def normalize_path(self, path):
-        """
-        标准化文件路径
-        
-        Args:
-            path (str): 原始路径
-            
-        Returns:
-            str: 标准化后的路径
-        """
-        if not path:
-            return ""
-        
-        # 将所有斜杠转换为系统默认格式
-        normalized = os.path.normpath(path)
-        
-        # 在Windows系统上，确保使用反斜杠
-        if os.name == 'nt':
-            normalized = normalized.replace('/', '\\')
-        
-        return normalized
-    
-    def get_relative_path(self, full_path, base_path):
-        """
-        获取相对路径
-        
-        Args:
-            full_path (str): 完整路径
-            base_path (str): 基础路径
-            
-        Returns:
-            str: 相对路径
-        """
-        try:
-            return os.path.relpath(full_path, base_path)
-        except Exception:
-            return full_path
-    
-    def ensure_directory_exists(self, directory):
-        """
-        确保目录存在，如果不存在则创建
-        
-        Args:
-            directory (str): 目录路径
-            
-        Returns:
-            bool: 是否成功创建或已存在
-        """
-        try:
-            if not os.path.exists(directory):
-                os.makedirs(directory)
-                print(f"已创建目录: {directory}")
-            return True
-        except Exception as e:
-            print(f"创建目录失败: {str(e)}")
-            return False
