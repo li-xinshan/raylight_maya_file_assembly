@@ -2,6 +2,7 @@
 XGen管理模块
 负责处理XGen毛发缓存路径设置和状态检查
 """
+import glob
 
 import maya.cmds as cmds
 import os
@@ -30,6 +31,8 @@ class XGenManager:
 
         print(f"设置XGen毛发缓存路径...")
         print(f"缓存模板: {cache_template}")
+
+        all_fur_abc = glob.glob(cache_template)
 
         # 拷贝abc到当前maya文件路径
         current_scene = cmds.file(q=True, sceneName=True)
@@ -74,6 +77,12 @@ class XGenManager:
                     # 将${DESC}替换为实际的描述名称
                     cache_path = cache_template.replace('${DESC}', desc_name)
 
+                    # 获取实际的名字
+                    for _ in all_fur_abc:
+                        if desc_name in _:
+                            cache_path = _.replace('\\', '/')
+                            break
+
                     if self._set_cache_for_description(palette, desc, desc_name, cache_path):
                         results['updated_descriptions'] += 1
                     else:
@@ -104,17 +113,9 @@ class XGenManager:
         current_dir = os.path.dirname(current_scene)
         scene_name = os.path.basename(current_scene)
 
-        # 提取文件名模式，匹配 xxx.0001.abc
-        match = re.search(r'(.+)\.(\d+)\.abc$', os.path.basename(cache_template))
-        if not match:
-            print("❌ 无法解析abc文件序列号")
-            return None
-
-        base_name = match.group(1)
-
         # 查找所有序列文件
         cache_dir = os.path.abspath(os.path.join(cache_template, '../../growmesh_batch'))
-        search_pattern = os.path.join(cache_dir, "*.abc")
+        search_pattern = os.path.join(cache_dir, "*.abc").replace('\\', '/')
         print(search_pattern)
         abc_files = glob.glob(search_pattern)
 

@@ -34,6 +34,8 @@ class CoreAssembler:
         self.current_animation_files = []
         self.current_camera_file = None
         self.manual_camera_file = None
+        self.sequence = None
+        self.shot = None
         
         # 命名空间配置
         self.lookdev_namespace = "asset_lookdev"
@@ -117,7 +119,10 @@ class CoreAssembler:
         
         # 查找相机文件
         self._find_camera_file()
-    
+
+        # 获取当前场景和镜头信息
+        self._current_scene_and_shot()
+
     def _find_lookdev_file(self):
         """查找当前资产的lookdev文件"""
         if not self.current_asset:
@@ -169,7 +174,16 @@ class CoreAssembler:
             print(f"找到相机文件: {os.path.basename(camera_path)}")
         else:
             print("未找到相机文件")
-    
+
+    def _current_scene_and_shot(self):
+        """获取当前场景和镜头信息"""
+
+        if self.current_camera_file:
+            result = self.path_utils.extract_shot_info_from_animation_path(self.current_animation_files[0])
+            print(result)
+            if result:
+                self.sequence, self.shot = result.get('sequence'), result.get('shot')
+
     def _print_asset_summary(self):
         """打印资产摘要"""
         if not self.current_asset:
@@ -210,7 +224,9 @@ class CoreAssembler:
         return self.coordinator.step2_import_and_connect_animations(
             self.current_animation_files,
             self.lookdev_namespace,
-            self.animation_namespace
+            self.animation_namespace,
+            self.sequence,
+            self.shot
         )
     
     def step3_import_camera_abc(self):
@@ -230,7 +246,7 @@ class CoreAssembler:
     def step4_setup_hair_cache(self):
         """步骤4: 设置毛发缓存路径"""
         hair_template = self.config_manager.base_paths.get('hair_cache_template')
-        return self.coordinator.step4_setup_hair_cache(hair_template)
+        return self.coordinator.step4_setup_hair_cache(hair_template, self.sequence, self.shot)
     
     def step5_fix_materials(self):
         """步骤5: 检查修复材质"""
@@ -245,6 +261,10 @@ class CoreAssembler:
         if not self.current_asset:
             print("❌ 请先选择资产")
             return False
+
+        if not self.sequence or not self.shot:
+            print("❌ 无法确定当前场景和镜头信息")
+            return False
         
         config = {
             'lookdev_file': self.current_lookdev_file,
@@ -254,7 +274,9 @@ class CoreAssembler:
             'animation_namespace': self.animation_namespace,
             'start_frame': self.start_frame,
             'end_frame': self.end_frame,
-            'hair_cache_template': self.config_manager.base_paths.get('hair_cache_template')
+            'hair_cache_template': self.config_manager.base_paths.get('hair_cache_template'),
+            'sequence': self.sequence,
+            'shot': self.shot
         }
         
         return self.coordinator.execute_all_steps(config)

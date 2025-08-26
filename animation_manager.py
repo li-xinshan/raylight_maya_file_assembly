@@ -2,6 +2,7 @@
 动画管理模块
 负责处理动画连接、BlendShape创建和毛发布料处理
 """
+import glob
 
 import maya.cmds as cmds
 import os
@@ -124,7 +125,7 @@ class AnimationManager:
         self.animation_files = animation_files
         print(f"设置动画文件: {len(animation_files)} 个")
 
-    def find_fur_and_cloth_files(self, animation_files):
+    def find_fur_and_cloth_files(self, animation_files, sequence, shot):
         """
         查找毛发和布料文件 - 使用基于模板路径的查找方法
         
@@ -136,53 +137,20 @@ class AnimationManager:
         self.fur_files = []
         self.cloth_files = []
 
-        # 首先从动画文件列表中检查CFX文件（新的项目扫描方式）
-        for file_item in animation_files:
-            # 支持字典格式（新的项目扫描结果）和字符串格式（旧的配置）
-            if isinstance(file_item, dict):
-                file_path = file_item['path']
-                file_type = file_item.get('file_type', 'animation')
-                cfx_type = file_item.get('cfx_type', '')
-
-                # 直接根据文件类型判断
-                if file_type == 'cfx':
-                    if cfx_type == 'hair':
-                        self.fur_files.append(file_path)
-                        print(f"  找到毛发文件: {file_path}")
-                    elif cfx_type == 'cloth':
-                        self.cloth_files.append(file_path)
-                        print(f"  找到布料文件: {file_path}")
-                    continue
-            else:
-                # 兼容旧格式（字符串路径）
-                file_path = file_item
-                filename = os.path.basename(file_path).lower()
-
-                # 查找毛发文件
-                if any(keyword in filename for keyword in ['fur', 'hair', 'mao']):
-                    self.fur_files.append(file_path)
-                    print(f"  找到毛发文件: {os.path.basename(file_path)}")
-
-                # 查找布料文件  
-                elif any(keyword in filename for keyword in ['cloth', 'clothes', 'bu']):
-                    self.cloth_files.append(file_path)
-                    print(f"  找到布料文件: {os.path.basename(file_path)}")
-
         # 如果没有找到CFX文件，使用基于模板路径的查找方法（旧版本逻辑）
         if len(self.fur_files) == 0 and len(self.cloth_files) == 0:
             print("未在扫描结果中找到CFX文件，使用基于模板路径的查找...")
-            self._find_cfx_files_by_template()
+            self._find_cfx_files_by_template(sequence, shot)
 
         print(f"毛发文件: {len(self.fur_files)} 个")
         print(f"布料文件: {len(self.cloth_files)} 个")
 
-    def _find_cfx_files_by_template(self):
+    def _find_cfx_files_by_template(self, sequence, shot):
         """基于毛发缓存模板路径查找CFX文件（旧版本逻辑）"""
         try:
             from config_manager import ConfigManager
             config_manager = ConfigManager()
-            hair_template = config_manager.base_paths.get('hair_cache_template',
-                                                          '')
+            hair_template = config_manager.base_paths.get('hair_cache_template').format(sequence=sequence, shot=shot)
 
             # 查找毛发文件
             fur_file = self._find_fur_cache_file(hair_template)
@@ -225,13 +193,13 @@ class AnimationManager:
                 print(f"目录不存在: {hair_dir}")
                 return None
 
+            abc = glob.glob(os.path.join(hair_dir, '*/growmesh_batch/*.abc'))
+
             # 查找ABC文件
-            for root, dirs, files in os.walk(hair_dir):
-                for file in files:
-                    if file.endswith('.abc') and not file.startswith('cache_'):
-                        fur_file_path = os.path.join(root, file)
-                        print(f"找到候选毛发文件: {fur_file_path}")
-                        return fur_file_path
+            if abc:
+                fur_file_path = abc[0]
+                print(f"找到候选毛发文件: {fur_file_path}")
+                return fur_file_path
 
             return None
 
@@ -645,8 +613,10 @@ class AnimationManager:
         print("处理特殊组BlendShape连接...")
 
         try:
-            cfx_fur = f'{self.fur_namespace}:fur'
-            lookdev_fur = f'|{lookdev_namespace}:Master|{lookdev_namespace}:GEO|{lookdev_namespace}:CFX|{lookdev_namespace}:chr_dwl_growthmesh_grp'
+            cfx_fur = (f'|{self.fur_namespace}:fur'
+                       f'|{self.fur_namespace}:chr_{lookdev_namespace.replace("_lookdev", "")}_growthmesh_grp')
+            lookdev_fur = (f'|{lookdev_namespace}:Master|{lookdev_namespace}:GEO|{lookdev_namespace}:CFX'
+                           f'|{lookdev_namespace}:chr_{lookdev_namespace.replace("_lookdev", "")}_growthmesh_grp')
             print(cfx_fur, lookdev_fur)
             self.blendshape_manager.create_precise_blendshapes_between_groups(
                 cfx_fur, lookdev_fur

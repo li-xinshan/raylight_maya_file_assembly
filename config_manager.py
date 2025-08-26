@@ -28,7 +28,7 @@ class ConfigManager:
             'assets_root': 'P:\\LHSN\\assets',
             'publish_root': 'P:\\LHSN\\publish',
             'lookdev_template': '{assets_root}\\{asset_type}\\{asset_name}\\lookdev\\maya\\publish',
-            'hair_cache_template': 'P:/LHSN/cache/dcc/shot/{}/{}/cfx/alembic/hair/*/outcurve/*.abc'
+            'hair_cache_template': 'P:/LHSN/cache/dcc/shot/{sequence}/{shot}/cfx/alembic/hair/*/outcurve/*.abc'
         }
         
         # 项目扫描配置

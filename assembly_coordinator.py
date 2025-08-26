@@ -67,7 +67,7 @@ class AssemblyCoordinator:
 
         return success
 
-    def step2_import_and_connect_animations(self, animation_files, lookdev_namespace, animation_namespace):
+    def step2_import_and_connect_animations(self, animation_files, lookdev_namespace, animation_namespace, sequence, shot):
         """
         步骤2: 导入动画文件并连接
         
@@ -75,7 +75,9 @@ class AssemblyCoordinator:
             animation_files (list): 动画文件列表
             lookdev_namespace (str): Lookdev命名空间
             animation_namespace (str): 动画命名空间
-            
+            sequence
+            shot
+
         Returns:
             bool: 是否成功
         """
@@ -86,7 +88,7 @@ class AssemblyCoordinator:
             return False
 
         # 分离毛发、布料和其他动画文件
-        self.animation_manager.find_fur_and_cloth_files(animation_files)
+        self.animation_manager.find_fur_and_cloth_files(animation_files, sequence, shot)
 
         # 获取非毛发布料的动画文件
         regular_animation_files = []
@@ -147,23 +149,23 @@ class AssemblyCoordinator:
         else:
             return False, None, None
 
-    def step4_setup_hair_cache(self, hair_cache_template=None):
+    def step4_setup_hair_cache(self, hair_cache_template, sequence, shot):
         """
         步骤4: 设置毛发缓存
         
         Args:
             hair_cache_template (str): 毛发缓存模板
-            
+            sequence (str): 场景
+            shot (str): 镜头
         Returns:
             bool: 是否成功
         """
         print("\n=== 步骤4: 设置毛发缓存 ===")
 
-        if hair_cache_template is None:
-            hair_cache_template = "P:/LHSN/cache/dcc/shot/s310/c0990/cfx/alembic/hair/dwl_01/outcurve/cache_${DESC}.0001.abc"
-
-        results = self.xgen_manager.setup_hair_cache(hair_cache_template)
-
+        a = hair_cache_template.format(sequence=sequence, shot=shot)
+        print(a)
+        results = self.xgen_manager.setup_hair_cache(a)
+        print(results)
         success = results['updated_descriptions'] > 0 or results['total_palettes'] == 0
         if success:
             self.assembly_status['hair_configured'] = True
@@ -224,10 +226,16 @@ class AssemblyCoordinator:
             (self.step2_import_and_connect_animations, [
                 config['animation_files'],
                 config['lookdev_namespace'],
-                config['animation_namespace']
+                config['animation_namespace'],
+                config['sequence'],
+                config['shot']
             ]),
             (self.step3_import_camera, [config['camera_file']]),
-            (self.step4_setup_hair_cache, [config.get('hair_cache_template')]),
+            (self.step4_setup_hair_cache, [
+                config.get('hair_cache_template'),
+                config['sequence'],
+                config['shot']
+            ]),
             (self.step5_fix_materials, []),
             (self.step6_setup_scene, [
                 config['start_frame'],
