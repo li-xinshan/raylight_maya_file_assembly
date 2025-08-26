@@ -232,7 +232,7 @@ class ABCImporter:
         success_count = 0
         
         for i, animation_file in enumerate(animation_files, 1):
-            print(f"\n处理动画文件 {i}/{len(animation_files)}: {os.path.basename(animation_file)}")
+            print(f"\n处理动画文件 {i}/{len(animation_files)}: {animation_file}")
             
             # 导入单个动画文件
             success, transforms, abc_node = self.import_single_animation_abc(animation_file, animation_namespace)

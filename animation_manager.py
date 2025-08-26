@@ -148,10 +148,10 @@ class AnimationManager:
                 if file_type == 'cfx':
                     if cfx_type == 'hair':
                         self.fur_files.append(file_path)
-                        print(f"  找到毛发文件: {os.path.basename(file_path)}")
+                        print(f"  找到毛发文件: {file_path}")
                     elif cfx_type == 'cloth':
                         self.cloth_files.append(file_path)
-                        print(f"  找到布料文件: {os.path.basename(file_path)}")
+                        print(f"  找到布料文件: {file_path}")
                     continue
             else:
                 # 兼容旧格式（字符串路径）
@@ -182,7 +182,7 @@ class AnimationManager:
             from config_manager import ConfigManager
             config_manager = ConfigManager()
             hair_template = config_manager.base_paths.get('hair_cache_template',
-                                                          'P:/LHSN/cache/dcc/shot/s310/c0990/cfx/alembic/hair/dwl_01/outcurve/cache_${DESC}.0001.abc')
+                                                          '')
 
             # 查找毛发文件
             fur_file = self._find_fur_cache_file(hair_template)
@@ -202,6 +202,7 @@ class AnimationManager:
     def _find_fur_cache_file(self, hair_template):
         """查找毛发解算文件（基于旧版本逻辑）"""
         try:
+            print(hair_template)
             # 解析路径获取hair目录
             path_parts = hair_template.replace('\\', '/').split('/')
             hair_index = -1
@@ -324,7 +325,7 @@ class AnimationManager:
     def _import_fur_file(self, fur_file):
         """导入单个毛发文件"""
         try:
-            print(f"导入毛发文件: {os.path.basename(fur_file)}")
+            print(f"导入毛发文件: {fur_file}")
 
             if not os.path.exists(fur_file):
                 print(f"❌ 毛发文件不存在: {fur_file}")

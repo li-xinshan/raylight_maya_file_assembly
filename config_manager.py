@@ -28,7 +28,7 @@ class ConfigManager:
             'assets_root': 'P:\\LHSN\\assets',
             'publish_root': 'P:\\LHSN\\publish',
             'lookdev_template': '{assets_root}\\{asset_type}\\{asset_name}\\lookdev\\maya\\publish',
-            'hair_cache_template': 'P:/LHSN/cache/dcc/shot/s310/c0990/cfx/alembic/hair/dwl_01/outcurve/cache_${DESC}.0001.abc'
+            'hair_cache_template': 'P:/LHSN/cache/dcc/shot/{}/{}/cfx/alembic/hair/*/outcurve/*.abc'
         }
         
         # 项目扫描配置
@@ -97,72 +97,6 @@ class ConfigManager:
         
         return lookdev_dir
     
-    def extract_camera_path_from_animation(self, animation_abc_path):
-        """
-        从动画ABC路径推导相机ABC路径
-        
-        Args:
-            animation_abc_path (str): 动画ABC文件路径
-            
-        Returns:
-            str: 相机ABC文件路径，如果推导失败返回None
-        """
-        try:
-            # 解析路径结构
-            # 输入: P:\LHSN\publish\shot\s310\c0990\element\ani\ani\cache\v002\LHSN_s310_c0990_ani_ani_v002-chr_dwl_01.abc
-            # 输出: P:\LHSN\publish\shot\s310\c0990\element\ani\ani\LHSN_s310_c0990_ani_cam_v002.abc
-            
-            # 标准化路径分隔符
-            normalized_path = animation_abc_path.replace('\\', '/')
-            
-            # 获取目录路径，去掉最后的 cache/vXXX 部分
-            # 找到cache目录的位置
-            path_parts = normalized_path.split('/')
-            cache_index = -1
-            for i, part in enumerate(path_parts):
-                if part == 'cache':
-                    cache_index = i
-                    break
-            
-            if cache_index > 0:
-                # 重构基础目录路径（到cache之前）
-                base_parts = path_parts[:cache_index]
-                dir_path = '/'.join(base_parts)
-            else:
-                # 如果没有找到cache，使用父父目录
-                dir_path = os.path.dirname(os.path.dirname(normalized_path)).replace('\\', '/')
-            
-            # 获取文件名并解析
-            filename = os.path.basename(animation_abc_path)
-            
-            # 解析版本信息
-            # LHSN_s310_c0990_ani_ani_v002-chr_dwl_01.abc
-            # 提取基础名称和版本
-            if '_v' in filename:
-                base_part = filename.split('_v')[0]  # LHSN_s310_c0990_ani_ani
-                version_part = filename.split('_v')[1].split('-')[0]  # 002
-                
-                # 构造相机文件名：将最后一个 ani 替换为 cam
-                base_parts = base_part.split('_')
-                if base_parts and base_parts[-1] == 'ani':
-                    base_parts[-1] = 'cam'
-                    camera_base = '_'.join(base_parts)
-                    camera_filename = f"{camera_base}_v{version_part}.abc"
-                else:
-                    # 如果最后不是ani，直接添加cam
-                    camera_filename = f"{base_part}_cam_v{version_part}.abc"
-                
-                camera_path = f"{dir_path}/{camera_filename}"
-                
-                # 转回Windows格式（如果需要）
-                return camera_path.replace('/', '\\')
-            
-            return None
-            
-        except Exception as e:
-            print(f"推导相机路径失败: {str(e)}")
-            return None
-    
     def get_asset_config(self, asset_name):
         """
         获取指定资产的配置
@@ -193,15 +127,6 @@ class ConfigManager:
                     animation_files.append(output_path)
         
         return animation_files
-    
-    def get_hair_cache_template(self):
-        """
-        获取毛发缓存模板路径
-        
-        Returns:
-            str: 毛发缓存模板路径
-        """
-        return self.base_paths['hair_cache_template']
     
     def set_hair_cache_template(self, template):
         """
