@@ -125,7 +125,7 @@ class AnimationManager:
         self.animation_files = animation_files
         print(f"设置动画文件: {len(animation_files)} 个")
 
-    def find_fur_and_cloth_files(self, animation_files, sequence, shot):
+    def find_fur_and_cloth_files(self, animation_files, sequence, shot, lookdev_namespace):
         """
         查找毛发和布料文件 - 使用基于模板路径的查找方法
         
@@ -140,12 +140,12 @@ class AnimationManager:
         # 如果没有找到CFX文件，使用基于模板路径的查找方法（旧版本逻辑）
         if len(self.fur_files) == 0 and len(self.cloth_files) == 0:
             print("未在扫描结果中找到CFX文件，使用基于模板路径的查找...")
-            self._find_cfx_files_by_template(sequence, shot)
+            self._find_cfx_files_by_template(sequence, shot, lookdev_namespace)
 
         print(f"毛发文件: {len(self.fur_files)} 个")
         print(f"布料文件: {len(self.cloth_files)} 个")
 
-    def _find_cfx_files_by_template(self, sequence, shot):
+    def _find_cfx_files_by_template(self, sequence, shot, lookdev_namespace):
         """基于毛发缓存模板路径查找CFX文件（旧版本逻辑）"""
         try:
             from config_manager import ConfigManager
@@ -159,7 +159,7 @@ class AnimationManager:
                 print(f"  基于模板找到毛发文件: {os.path.basename(fur_file)}")
 
             # 查找布料文件
-            cloth_file = self._find_cloth_cache_file(hair_template)
+            cloth_file = self._find_cloth_cache_file(hair_template, lookdev_namespace)
             if cloth_file:
                 self.cloth_files.append(cloth_file)
                 print(f"  基于模板找到布料文件: {os.path.basename(cloth_file)}")
@@ -207,7 +207,7 @@ class AnimationManager:
             print(f"查找毛发解算文件失败: {str(e)}")
             return None
 
-    def _find_cloth_cache_file(self, hair_template):
+    def _find_cloth_cache_file(self, hair_template, lookdev_namespace):
         """查找布料解算文件（基于旧版本逻辑）"""
         try:
             # 解析路径获取基础cfx目录
@@ -223,7 +223,8 @@ class AnimationManager:
                 return None
 
             # 构建cloth目录路径
-            cloth_dir = '/'.join(path_parts[:alembic_index + 1]) + '/cloth'
+            cloth_dir = ('/'.join(path_parts[:alembic_index + 1]) + '/cloth' + r"{}_01".
+                         format(lookdev_namespace.replace("_lookdev", '')))
             cloth_dir = cloth_dir.replace('/', '\\')
 
             print(f"搜索布料解算文件目录: {cloth_dir}")

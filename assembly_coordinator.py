@@ -88,7 +88,7 @@ class AssemblyCoordinator:
             return False
 
         # 分离毛发、布料和其他动画文件
-        self.animation_manager.find_fur_and_cloth_files(animation_files, sequence, shot)
+        self.animation_manager.find_fur_and_cloth_files(animation_files, sequence, shot, lookdev_namespace)
 
         # 获取非毛发布料的动画文件
         regular_animation_files = []

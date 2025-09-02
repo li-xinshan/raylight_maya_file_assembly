@@ -113,27 +113,34 @@ class XGenManager:
         current_dir = os.path.dirname(current_scene)
         scene_name = os.path.basename(current_scene)
 
-        # 查找所有序列文件
+        # # 查找所有序列文件
+        print('开始寻找毛发生长面的缓存abc文件...')
         cache_dir = os.path.abspath(os.path.join(cache_template, '../../growmesh_batch'))
         search_pattern = os.path.join(cache_dir, "*.abc").replace('\\', '/')
-        print(search_pattern)
+        print(f"寻找模板：{search_pattern}")
         abc_files = glob.glob(search_pattern)
 
         if not abc_files:
             print("❌ 未找到abc文件")
             return None
 
-        # 找到最新序列号文件
         max_seq = -1
         latest_file = None
 
         for file_path in abc_files:
-            seq_match = re.search(rf'\.(\d+)\.abc$', os.path.basename(file_path))
+            filename = os.path.basename(file_path)
+            seq_match = re.search(rf'\.(\d+)\.abc$', filename)
+
             if seq_match:
                 seq_num = int(seq_match.group(1))
                 if seq_num > max_seq:
                     max_seq = seq_num
                     latest_file = file_path
+
+        # 如果没找到有序列号的文件，就用第一个
+        if not latest_file and abc_files:
+            latest_file = abc_files[0]
+            print(f"未找到序列号文件，使用第一个: {os.path.basename(latest_file)}")
 
         if not latest_file:
             print("❌ 未找到有效序列文件")
@@ -153,7 +160,7 @@ class XGenManager:
 
         # 更新为最新序列号文件名
         target_dir = os.path.join(current_dir, os.path.dirname(alembic_path))
-        target_filename = f"{scene_name.split('.')[0]}__{namespaces.split(':')[0]}__{namespaces.split(':')[1]}.abc"
+        target_filename = f"{scene_name.split('.')[0]}__{namespaces.split(':')[0]}__ns__{namespaces.split(':')[1]}.abc"
         target_path = os.path.join(target_dir, target_filename).replace('\\', '/')
 
         # 创建目录并拷贝
