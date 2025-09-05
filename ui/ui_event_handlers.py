@@ -42,24 +42,191 @@ class UIEventHandlers:
             self.on_config_path_changed()
 
     def on_asset_changed(self, *args):
-        """资产选择改变时的回调"""
-        selected_asset = cmds.optionMenu(self.ui['asset_list'], query=True, value=True)
-        if selected_asset and selected_asset not in ["请先加载配置文件", "请先选择场次镜头或加载配置文件"]:
-            # 解析资产名称
-            if " (" in selected_asset and selected_asset.endswith(")"):
-                asset_name = selected_asset.split(" (")[0]
-            else:
-                asset_name = selected_asset
-            
-            print(f"选择资产: {selected_asset} -> 解析为: {asset_name}")
+        """资产选择改变时的回调 - 旧版本兼容"""
+        # 这个函数保留用于兼容，但现在使用on_assets_selected
+        pass
+    
+    def on_assets_selected(self, *args):
+        """资产多选改变时的回调"""
+        selected_items = cmds.textScrollList(self.ui['asset_list'], query=True, selectItem=True) or []
+        
+        if not selected_items:
+            return
+        
+        # 过滤掉提示信息
+        valid_assets = [item for item in selected_items 
+                       if item not in ["请先加载配置文件", "请先选择场次镜头或加载配置文件"]]
+        
+        if not valid_assets:
+            return
+        
+        # 如果只选择了一个资产，设置为当前资产
+        if len(valid_assets) == 1:
+            asset_name = self._parse_asset_name(valid_assets[0])
             success = self.core.set_current_asset(asset_name)
             if success:
                 self.main_ui.update_asset_info()
                 self.main_ui.update_namespace()
+        else:
+            # 多选时显示统计信息
+            self._show_batch_info(valid_assets)
+    
+    def _parse_asset_name(self, display_name):
+        """解析资产显示名称获取实际资产名"""
+        if " (" in display_name and display_name.endswith(")"):
+            return display_name.split(" (")[0]
+        return display_name
+    
+    def _show_batch_info(self, selected_assets):
+        """显示批量选择信息"""
+        # 统计选中的资产类型
+        asset_types = {}
+        for asset in selected_assets:
+            asset_name = self._parse_asset_name(asset)
+            asset_config = self.core.config_manager.get_asset_config(asset_name)
+            if asset_config:
+                asset_type = asset_config.get('asset_type', 'unknown')
+                if asset_type not in asset_types:
+                    asset_types[asset_type] = []
+                asset_types[asset_type].append(asset_name)
+        
+        # 更新信息显示
+        info_text = f"已选择 {len(selected_assets)} 个资产:\n\n"
+        for asset_type, assets in asset_types.items():
+            info_text += f"{asset_type}: {len(assets)} 个\n"
+            for asset in assets[:3]:  # 只显示前3个
+                info_text += f"  • {asset}\n"
+            if len(assets) > 3:
+                info_text += f"  ... 还有 {len(assets)-3} 个\n"
+        
+        cmds.scrollField(self.ui['asset_info'], edit=True, text=info_text)
 
     def refresh_assets(self, *args):
         """刷新资产列表"""
         self.main_ui.update_asset_list()
+    
+    # ===== 批量选择功能 =====
+    
+    def select_all_assets(self, *args):
+        """全选所有资产"""
+        all_items = cmds.textScrollList(self.ui['asset_list'], query=True, allItems=True) or []
+        valid_items = [item for item in all_items 
+                      if item not in ["请先加载配置文件", "请先选择场次镜头或加载配置文件"]]
+        if valid_items:
+            cmds.textScrollList(self.ui['asset_list'], edit=True, deselectAll=True)
+            cmds.textScrollList(self.ui['asset_list'], edit=True, selectItem=valid_items)
+            self.on_assets_selected()
+    
+    def deselect_all_assets(self, *args):
+        """取消所有选择"""
+        cmds.textScrollList(self.ui['asset_list'], edit=True, deselectAll=True)
+        cmds.scrollField(self.ui['asset_info'], edit=True, text="未选择资产")
+    
+    def select_character_assets(self, *args):
+        """选择所有角色资产"""
+        self._select_by_type("character")
+    
+    def select_prop_assets(self, *args):
+        """选择所有道具资产"""
+        self._select_by_type("prop")
+    
+    def _select_by_type(self, asset_type):
+        """按类型选择资产"""
+        all_items = cmds.textScrollList(self.ui['asset_list'], query=True, allItems=True) or []
+        
+        # 获取指定类型的资产
+        type_assets = []
+        for item in all_items:
+            if item in ["请先加载配置文件", "请先选择场次镜头或加载配置文件"]:
+                continue
+            asset_name = self._parse_asset_name(item)
+            asset_config = self.core.config_manager.get_asset_config(asset_name)
+            if asset_config and asset_config.get('asset_type') == asset_type:
+                type_assets.append(item)
+        
+        if type_assets:
+            cmds.textScrollList(self.ui['asset_list'], edit=True, deselectAll=True)
+            cmds.textScrollList(self.ui['asset_list'], edit=True, selectItem=type_assets)
+            self.on_assets_selected()
+        else:
+            self.main_ui.log_message(f"没有找到类型为 {asset_type} 的资产")
+    
+    def batch_import_selected(self, *args):
+        """批量导入选中的资产"""
+        selected_items = cmds.textScrollList(self.ui['asset_list'], query=True, selectItem=True) or []
+        
+        # 过滤有效资产
+        valid_assets = [item for item in selected_items 
+                       if item not in ["请先加载配置文件", "请先选择场次镜头或加载配置文件"]]
+        
+        if not valid_assets:
+            self.main_ui.log_message("❌ 请先选择要导入的资产")
+            return
+        
+        # 确认对话框
+        result = cmds.confirmDialog(
+            title="批量导入确认",
+            message=f"即将批量导入 {len(valid_assets)} 个资产\n\n是否继续？",
+            button=["执行", "取消"],
+            defaultButton="执行",
+            cancelButton="取消",
+            dismissString="取消"
+        )
+        
+        if result != "执行":
+            return
+        
+        # 执行批量导入
+        self._execute_batch_import(valid_assets)
+    
+    def _execute_batch_import(self, asset_list):
+        """执行批量导入"""
+        self.main_ui.log_message(f"\n{'='*50}")
+        self.main_ui.log_message(f"开始批量导入 {len(asset_list)} 个资产")
+        self.main_ui.log_message(f"{'='*50}\n")
+        
+        success_count = 0
+        failed_assets = []
+        
+        # 逐个导入资产
+        for i, asset_item in enumerate(asset_list):
+            asset_name = self._parse_asset_name(asset_item)
+            
+            self.main_ui.log_message(f"\n[{i+1}/{len(asset_list)}] 正在导入: {asset_name}")
+            self.main_ui.log_message("-" * 40)
+            
+            # 设置当前资产
+            success = self.core.set_current_asset(asset_name)
+            if not success:
+                self.main_ui.log_message(f"❌ 设置资产 {asset_name} 失败")
+                failed_assets.append(asset_name)
+                continue
+            
+            # 执行所有步骤
+            try:
+                result = self.core.execute_all_steps()
+                if result:
+                    success_count += 1
+                    self.main_ui.log_message(f"✅ 资产 {asset_name} 导入成功")
+                else:
+                    failed_assets.append(asset_name)
+                    self.main_ui.log_message(f"❌ 资产 {asset_name} 导入失败")
+            except Exception as e:
+                failed_assets.append(asset_name)
+                self.main_ui.log_message(f"❌ 资产 {asset_name} 导入异常: {str(e)}")
+            
+            # 更新进度
+            progress = int((i + 1) / len(asset_list) * 100)
+            self.main_ui.update_progress(progress)
+        
+        # 显示总结
+        self.main_ui.log_message(f"\n{'='*50}")
+        self.main_ui.log_message(f"批量导入完成")
+        self.main_ui.log_message(f"成功: {success_count} 个")
+        self.main_ui.log_message(f"失败: {len(failed_assets)} 个")
+        if failed_assets:
+            self.main_ui.log_message(f"失败资产: {', '.join(failed_assets)}")
+        self.main_ui.log_message(f"{'='*50}\n")
 
     def show_asset_details(self, *args):
         """显示资产详情"""

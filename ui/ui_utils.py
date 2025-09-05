@@ -15,7 +15,13 @@ class UIUtils:
     
     def update_progress(self, value):
         """更新进度条"""
-        cmds.progressBar(self.ui['progress'], edit=True, progress=value)
+        # 如果传入的是百分比（0-100），转换为Maya进度条的值（0-6）
+        if value > 6:
+            # 百分比模式，将0-100映射到0-100
+            cmds.progressBar(self.ui['progress'], edit=True, maxValue=100, progress=value)
+        else:
+            # 步骤模式，使用原来的0-6
+            cmds.progressBar(self.ui['progress'], edit=True, maxValue=6, progress=value)
 
     def update_button_state(self, button_name, success):
         """更新按钮状态"""
@@ -56,11 +62,9 @@ class UIUtils:
         print(formatted_message.strip())
 
     def update_asset_list(self, assets_data):
-        """更新资产列表"""
-        # 清除现有选项
-        menu_items = cmds.optionMenu(self.ui['asset_list'], query=True, itemListLong=True)
-        if menu_items:
-            cmds.deleteUI(menu_items)
+        """更新资产列表 - 支持textScrollList"""
+        # 清除现有项目
+        cmds.textScrollList(self.ui['asset_list'], edit=True, removeAll=True)
 
         # 添加新选项
         if assets_data:
@@ -68,6 +72,7 @@ class UIUtils:
             print(f"\n=== 资产列表调试信息 ===")
             print(f"总数据量: {len(assets_data)} 个资产")
             
+            asset_items = []
             for i, asset in enumerate(assets_data, 1):
                 asset_name = asset.get('asset_name', 'Unknown')
                 asset_type = asset.get('asset_type', 'Unknown')
@@ -75,17 +80,19 @@ class UIUtils:
                 
                 print(f"{i}. {asset_name} (类型: {asset_type})")
                 print(f"   输出文件数: {len(outputs)}")
-                for j, output in enumerate(outputs, 1):
-                    print(f"     {j}. {output}")
                 
-                # 添加到UI
+                # 添加到列表
                 display_name = f"{asset_name} ({asset_type})"
-                cmds.menuItem(parent=self.ui['asset_list'], label=display_name)
+                asset_items.append(display_name)
+            
+            # 批量添加到textScrollList
+            cmds.textScrollList(self.ui['asset_list'], edit=True, append=asset_items)
             
             print(f"=== 调试信息结束 ===\n")
             return len(assets_data)
         else:
-            cmds.menuItem(parent=self.ui['asset_list'], label="请先选择场次镜头或加载配置文件")
+            cmds.textScrollList(self.ui['asset_list'], edit=True, 
+                              append=["请先选择场次镜头或加载配置文件"])
             return 0
 
     def update_asset_info(self, core):

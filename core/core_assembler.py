@@ -4,10 +4,13 @@
 """
 
 import os
-from config_manager import ConfigManager
-from file_manager import FileManager
-from path_utils import PathUtils
-from assembly_coordinator import AssemblyCoordinator
+import sys
+
+# 简化的直接导入
+from config.config_manager import ConfigManager
+from utils.file_manager import FileManager
+from utils.path_utils import PathUtils
+from core.assembly_coordinator import AssemblyCoordinator
 
 
 class CoreAssembler:

@@ -7,7 +7,14 @@ import glob
 import maya.cmds as cmds
 import os
 import re
-from blendshape_manager import BlendshapeManager
+import sys
+
+# 简化的直接导入
+try:
+    from managers.blendshape_manager import BlendshapeManager
+except ImportError:
+    # 如果相对导入失败，尝试绝对导入
+    from blendshape_manager import BlendshapeManager
 
 
 def import_abc_to_group(abc_path, namespace='cloth', group_name='group'):
@@ -148,7 +155,7 @@ class AnimationManager:
     def _find_cfx_files_by_template(self, sequence, shot, lookdev_namespace):
         """基于毛发缓存模板路径查找CFX文件（旧版本逻辑）"""
         try:
-            from config_manager import ConfigManager
+            from config.config_manager import ConfigManager
             config_manager = ConfigManager()
             hair_template = config_manager.base_paths.get('hair_cache_template').format(sequence=sequence, shot=shot)
 

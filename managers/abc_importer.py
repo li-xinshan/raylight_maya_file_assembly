@@ -7,7 +7,7 @@ import maya.cmds as cmds
 import maya.mel as mel
 import os
 import re
-from blendshape_manager import BlendshapeManager
+from .blendshape_manager import BlendshapeManager
 
 class ABCImporter:
     """ABC导入管理器"""

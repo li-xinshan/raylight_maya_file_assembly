@@ -3,12 +3,13 @@
 负责协调各个管理器的执行流程和状态管理
 """
 
-from lookdev_manager import LookdevManager
-from animation_manager import AnimationManager
-from abc_importer import ABCImporter
-from scene_manager import SceneManager
-from material_manager import MaterialManager
-from xgen_manager import XGenManager
+# 简化的直接导入
+from managers.lookdev_manager import LookdevManager
+from managers.animation_manager import AnimationManager
+from managers.abc_importer import ABCImporter
+from managers.scene_manager import SceneManager
+from managers.material_manager import MaterialManager
+from managers.xgen_manager import XGenManager
 
 
 class AssemblyCoordinator:

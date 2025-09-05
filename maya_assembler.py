@@ -9,14 +9,42 @@ import maya.cmds as cmds
 import maya.mel as mel
 import maya.OpenMayaMPx as omm
 import os
+import sys
 
-# 导入核心组装器
-from core_assembler import CoreAssembler
+# 使用inspect模块获取脚本路径
+import inspect
 
-# 导入UI模块
-from ui_components import UIComponents
-from ui_event_handlers import UIEventHandlers
-from ui_utils import UIUtils
+# 获取当前脚本路径
+try:
+    current_script = inspect.getfile(inspect.currentframe())
+    SCRIPT_DIR = os.path.dirname(os.path.abspath(current_script))
+except:
+    # 如果inspect失败，尝试其他方法
+    try:
+        # 尝试从__file__获取
+        SCRIPT_DIR = os.path.dirname(os.path.abspath(__file__))
+    except:
+        # 最后使用当前工作目录
+        SCRIPT_DIR = os.getcwd()
+        print(f"⚠️  使用当前工作目录: {SCRIPT_DIR}")
+
+# 添加脚本目录到Python路径
+if SCRIPT_DIR not in sys.path:
+    sys.path.insert(0, SCRIPT_DIR)
+
+# 导入模块
+try:
+    from core.core_assembler import CoreAssembler
+    from ui.ui_components import UIComponents  
+    from ui.ui_event_handlers import UIEventHandlers
+    from ui.ui_utils import UIUtils
+    print(f"✅ 模块导入成功，脚本路径: {SCRIPT_DIR}")
+except ImportError as e:
+    import traceback
+    print(traceback.format_exc())
+    print(f"❌ 导入模块失败: {e}")
+    print(f"当前脚本路径: {SCRIPT_DIR}")
+    CoreAssembler = UIComponents = UIEventHandlers = UIUtils = None
 
 
 class LookdevAnimationSetupUI:

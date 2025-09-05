@@ -85,13 +85,31 @@ class UIComponents:
 
         cmds.separator(height=10)
 
-        # 资产选择
+        # 资产选择 - 支持批量选择
         cmds.text(label="选择资产:", align="left", font="boldLabelFont")
-        asset_row = cmds.rowLayout(numberOfColumns=3, adjustableColumn=2, columnWidth3=(320, 80, 40))
-        self.ui['asset_list'] = cmds.optionMenu(label="", changeCommand=self.handler.on_asset_changed)
-        cmds.menuItem(label="请先选择场次镜头或加载配置文件")
-        cmds.button(label="刷新资产", command=self.handler.refresh_assets, width=80)
-        cmds.button(label="详情", command=self.handler.show_asset_details, width=40)
+        
+        # 批量选择控制
+        batch_control_row = cmds.rowLayout(numberOfColumns=4, adjustableColumn=4, columnWidth4=(100, 100, 100, 100))
+        cmds.button(label="全选", command=self.handler.select_all_assets, width=100)
+        cmds.button(label="全不选", command=self.handler.deselect_all_assets, width=100)
+        cmds.button(label="选择角色", command=self.handler.select_character_assets, width=100)
+        cmds.button(label="选择道具", command=self.handler.select_prop_assets, width=100)
+        cmds.setParent('..')
+        
+        # 资产列表 - 使用textScrollList支持多选
+        self.ui['asset_list'] = cmds.textScrollList(
+            numberOfRows=8,
+            allowMultiSelection=True,
+            height=150,
+            selectCommand=self.handler.on_assets_selected,
+            append=["请先选择场次镜头或加载配置文件"]
+        )
+        
+        # 资产操作按钮
+        asset_btn_row = cmds.rowLayout(numberOfColumns=3, adjustableColumn=3, columnWidth3=(150, 150, 100))
+        cmds.button(label="刷新资产", command=self.handler.refresh_assets, width=150)
+        cmds.button(label="批量导入选中", command=self.handler.batch_import_selected, width=150, backgroundColor=[0.3, 0.6, 0.3])
+        cmds.button(label="详情", command=self.handler.show_asset_details, width=100)
         cmds.setParent('..')
 
         cmds.separator(height=10)
