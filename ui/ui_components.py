@@ -93,7 +93,7 @@ class UIComponents:
         cmds.button(label="全选", command=self.handler.select_all_assets, width=100)
         cmds.button(label="全不选", command=self.handler.deselect_all_assets, width=100)
         cmds.button(label="选择角色", command=self.handler.select_character_assets, width=100)
-        cmds.button(label="选择道具", command=self.handler.select_prop_assets, width=100)
+        cmds.button(label="选择场景", command=self.handler.select_prop_assets, width=100)
         cmds.setParent('..')
         
         # 资产列表 - 使用textScrollList支持多选

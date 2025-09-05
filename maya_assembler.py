@@ -75,7 +75,7 @@ class LookdevAnimationSetupUI:
         self.section_collapse_states = {
             'config': False,    # 配置设置 - 默认展开
             'settings': True,   # 参数设置 - 默认收缩
-            'execution': False, # 执行操作 - 默认展开
+            'execution': True, # 执行操作 - 默认收缩
             'status': False,    # 状态信息 - 默认展开
             'tools': True       # 附加工具 - 默认收缩
         }

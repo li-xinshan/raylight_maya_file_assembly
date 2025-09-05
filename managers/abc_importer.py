@@ -267,6 +267,19 @@ class ABCImporter:
         try:
             print(f"导入相机ABC: {os.path.basename(camera_file)}")
 
+            # 检查是否已经导入了相同的相机文件
+            if self._is_camera_already_imported(camera_file):
+                print("✅ 相机已存在，跳过重复导入")
+                # 获取已存在相机的时间范围信息
+                abc_nodes = cmds.ls(type="AlembicNode")
+                if abc_nodes:
+                    abc_node = abc_nodes[-1]
+                    start_frame = cmds.getAttr(f"{abc_node}.startFrame")
+                    end_frame = cmds.getAttr(f"{abc_node}.endFrame")
+                    return True, start_frame, end_frame, abc_node
+                else:
+                    return True, 1001, 1100, None
+
             # 标准化路径分隔符
             camera_file = camera_file.replace('\\', '/')
 
@@ -373,6 +386,42 @@ class ABCImporter:
         except Exception as e:
             print(f"❌ 导入相机ABC失败: {str(e)}")
             return False, None, None, None
+    
+    def _is_camera_already_imported(self, camera_file):
+        """检查相机是否已经导入"""
+        try:
+            # 检查是否有相机存在
+            cameras = cmds.ls(type="camera")
+            if not cameras:
+                return False
+            
+            # 检查ABC节点数量（简单判断）
+            abc_nodes = cmds.ls(type="AlembicNode")
+            
+            # 如果有多个ABC节点，可能已经导入了相机
+            if len(abc_nodes) > 0:
+                # 检查ABC节点的文件路径属性
+                for abc_node in abc_nodes:
+                    try:
+                        abc_file_attr = f"{abc_node}.abc_File"
+                        if cmds.attributeQuery('abc_File', node=abc_node, exists=True):
+                            abc_file_path = cmds.getAttr(abc_file_attr)
+                            # 比较文件路径（标准化后）
+                            if abc_file_path and os.path.normpath(abc_file_path) == os.path.normpath(camera_file):
+                                return True
+                    except:
+                        continue
+            
+            # 如果有相机但没有找到匹配的ABC文件路径，做简单判断
+            # 非默认相机数量大于3个时，可能已导入相机
+            default_cameras = ['persp', 'top', 'front', 'side']
+            non_default_cameras = [cam for cam in cameras if cmds.listRelatives(cam, parent=True)[0] not in default_cameras]
+            
+            return len(non_default_cameras) > 0 and len(abc_nodes) > 0
+            
+        except Exception as e:
+            print(f"检查相机状态时出错: {str(e)}")
+            return False
     
     def _import_abc_file(self, animation_file, namespace):
         """导入ABC文件"""

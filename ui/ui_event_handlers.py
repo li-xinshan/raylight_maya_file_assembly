@@ -123,15 +123,43 @@ class UIEventHandlers:
         cmds.scrollField(self.ui['asset_info'], edit=True, text="未选择资产")
     
     def select_character_assets(self, *args):
-        """选择所有角色资产"""
-        self._select_by_type("character")
+        """选择所有角色资产（chr类型）"""
+        self._select_by_type_tag("chr")
     
     def select_prop_assets(self, *args):
-        """选择所有道具资产"""
-        self._select_by_type("prop")
+        """选择所有场景资产（prp类型）"""
+        self._select_by_type_tag("prp")
     
+    def _select_by_type_tag(self, type_tag):
+        """按括号中的类型标识选择资产，支持多种格式"""
+        all_items = cmds.textScrollList(self.ui['asset_list'], query=True, allItems=True) or []
+        
+        # 获取指定类型的资产
+        type_assets = []
+        for item in all_items:
+            if item in ["请先加载配置文件", "请先选择场次镜头或加载配置文件"]:
+                continue
+                
+            # 方法1: 检查括号中的类型标识 (如: "dwl (chr)")
+            if f"({type_tag})" in item.lower():
+                type_assets.append(item)
+                continue
+                
+            # 方法2: 检查资产名称前缀 (如: "chr_xiaoming")  
+            asset_name = self._parse_asset_name(item)
+            if asset_name.lower().startswith(type_tag.lower()):
+                type_assets.append(item)
+        
+        if type_assets:
+            cmds.textScrollList(self.ui['asset_list'], edit=True, deselectAll=True)
+            cmds.textScrollList(self.ui['asset_list'], edit=True, selectItem=type_assets)
+            self.on_assets_selected()
+            self.main_ui.log_message(f"已选择 {len(type_assets)} 个 {type_tag.upper()} 类型资产")
+        else:
+            self.main_ui.log_message(f"没有找到类型为 {type_tag.upper()} 的资产")
+
     def _select_by_type(self, asset_type):
-        """按类型选择资产"""
+        """按类型选择资产（保留用于其他用途）"""
         all_items = cmds.textScrollList(self.ui['asset_list'], query=True, allItems=True) or []
         
         # 获取指定类型的资产
@@ -153,6 +181,10 @@ class UIEventHandlers:
     
     def batch_import_selected(self, *args):
         """批量导入选中的资产"""
+        # 检查文件保存状态
+        if not self._check_file_save_before_execution():
+            return
+            
         selected_items = cmds.textScrollList(self.ui['asset_list'], query=True, selectItem=True) or []
         
         # 过滤有效资产
@@ -180,15 +212,38 @@ class UIEventHandlers:
         self._execute_batch_import(valid_assets)
     
     def _execute_batch_import(self, asset_list):
-        """执行批量导入"""
+        """执行批量导入 - 优化相机导入逻辑"""
         self.main_ui.log_message(f"\n{'='*50}")
         self.main_ui.log_message(f"开始批量导入 {len(asset_list)} 个资产")
         self.main_ui.log_message(f"{'='*50}\n")
         
         success_count = 0
         failed_assets = []
+        camera_imported = False
+        shared_camera_file = None
         
-        # 逐个导入资产
+        # 第一阶段：检查相机文件并只导入一次
+        self.main_ui.log_message("🎬 第一阶段：处理相机导入")
+        first_asset_name = self._parse_asset_name(asset_list[0])
+        if self.core.set_current_asset(first_asset_name):
+            shared_camera_file = self.core.current_camera_file
+            if shared_camera_file:
+                self.main_ui.log_message(f"检测到共享相机文件: {shared_camera_file}")
+                try:
+                    camera_success = self.core.step3_import_camera_abc()
+                    if camera_success:
+                        camera_imported = True
+                        self.main_ui.log_message("✅ 共享相机导入成功")
+                    else:
+                        self.main_ui.log_message("❌ 共享相机导入失败")
+                except Exception as e:
+                    self.main_ui.log_message(f"❌ 共享相机导入异常: {str(e)}")
+            else:
+                self.main_ui.log_message("⚠️  未找到相机文件")
+        
+        self.main_ui.log_message(f"\n🎭 第二阶段：批量导入资产")
+        
+        # 第二阶段：逐个导入资产（跳过相机步骤）
         for i, asset_item in enumerate(asset_list):
             asset_name = self._parse_asset_name(asset_item)
             
@@ -202,9 +257,9 @@ class UIEventHandlers:
                 failed_assets.append(asset_name)
                 continue
             
-            # 执行所有步骤
+            # 执行单个资产的步骤（智能跳过相机导入）
             try:
-                result = self.core.execute_all_steps()
+                result = self._execute_single_asset_steps(asset_name, camera_imported)
                 if result:
                     success_count += 1
                     self.main_ui.log_message(f"✅ 资产 {asset_name} 导入成功")
@@ -222,11 +277,52 @@ class UIEventHandlers:
         # 显示总结
         self.main_ui.log_message(f"\n{'='*50}")
         self.main_ui.log_message(f"批量导入完成")
-        self.main_ui.log_message(f"成功: {success_count} 个")
-        self.main_ui.log_message(f"失败: {len(failed_assets)} 个")
+        self.main_ui.log_message(f"相机导入: {'✅' if camera_imported else '❌'}")
+        self.main_ui.log_message(f"成功资产: {success_count} 个")
+        self.main_ui.log_message(f"失败资产: {len(failed_assets)} 个")
         if failed_assets:
-            self.main_ui.log_message(f"失败资产: {', '.join(failed_assets)}")
+            self.main_ui.log_message(f"失败列表: {', '.join(failed_assets)}")
         self.main_ui.log_message(f"{'='*50}\n")
+    
+    def _execute_single_asset_steps(self, asset_name, camera_already_imported):
+        """执行单个资产的导入步骤"""
+        try:
+            # 步骤1: 导入Lookdev文件
+            self.main_ui.log_message(f"  步骤1: 导入Lookdev")
+            step1_result = self.core.step1_import_lookdev()
+            
+            # 步骤2: 导入动画ABC并连接
+            self.main_ui.log_message(f"  步骤2: 导入动画ABC")
+            step2_result = self.core.step2_import_and_connect_animation_abc()
+            
+            # 步骤3: 相机导入（根据情况决定是否跳过）
+            if camera_already_imported:
+                self.main_ui.log_message(f"  步骤3: 跳过相机导入（已导入）")
+                step3_result = True
+            else:
+                self.main_ui.log_message(f"  步骤3: 导入相机ABC")
+                step3_result = self.core.step3_import_camera_abc()
+            
+            # 步骤4: 设置毛发缓存路径
+            self.main_ui.log_message(f"  步骤4: 设置毛发缓存")
+            step4_result = self.core.step4_setup_hair_cache()
+            
+            # 步骤5: 检查修复材质
+            self.main_ui.log_message(f"  步骤5: 修复材质")
+            step5_result = self.core.step5_fix_materials()
+            
+            # 步骤6: 设置场景参数
+            self.main_ui.log_message(f"  步骤6: 设置场景参数")
+            step6_result = self.core.step6_setup_scene()
+            
+            # 判断整体成功
+            all_steps_ok = all([step1_result, step2_result, step3_result, step4_result, step5_result, step6_result])
+            
+            return all_steps_ok
+            
+        except Exception as e:
+            self.main_ui.log_message(f"  ❌ 执行步骤时出错: {str(e)}")
+            return False
 
     def show_asset_details(self, *args):
         """显示资产详情"""
@@ -322,8 +418,72 @@ Lookdev文件: {summary['lookdev_file']}
 
     # ===== 执行步骤事件 =====
 
+    def _check_file_save_before_execution(self):
+        """在执行前检查文件是否保存"""
+        import maya.cmds as cmds
+        
+        # 检查场景是否有未保存的修改
+        scene_modified = cmds.file(query=True, modified=True)
+        scene_name = cmds.file(query=True, sceneName=True)
+        
+        # 如果场景有修改或者没有文件路径
+        if scene_modified or not scene_name:
+            if not scene_name:
+                message = "当前场景未保存，建议先保存场景文件再执行操作。\n\n是否继续执行？"
+            else:
+                message = f"当前场景有未保存的修改：\n{scene_name}\n\n建议先保存场景文件再执行操作。\n\n是否继续执行？"
+            
+            result = cmds.confirmDialog(
+                title="文件保存提醒",
+                message=message,
+                button=["保存并继续", "不保存继续", "取消"],
+                defaultButton="保存并继续",
+                cancelButton="取消",
+                dismissString="取消"
+            )
+            
+            if result == "保存并继续":
+                try:
+                    if scene_name:
+                        # 有文件路径，直接保存
+                        cmds.file(save=True)
+                        self.main_ui.log_message("✅ 场景文件已保存")
+                    else:
+                        # 没有文件路径，另存为
+                        saved_file = cmds.fileDialog2(
+                            dialogStyle=2,
+                            fileMode=0,
+                            caption="保存场景文件",
+                            fileFilter="Maya Scene (*.ma);;Maya Binary (*.mb)"
+                        )
+                        if saved_file:
+                            cmds.file(rename=saved_file[0])
+                            cmds.file(save=True)
+                            self.main_ui.log_message(f"✅ 场景文件已保存到: {saved_file[0]}")
+                        else:
+                            self.main_ui.log_message("❌ 用户取消了保存操作")
+                            return False
+                except Exception as e:
+                    self.main_ui.log_message(f"❌ 保存文件失败: {str(e)}")
+                    return False
+                return True
+                
+            elif result == "不保存继续":
+                self.main_ui.log_message("⚠️  用户选择不保存文件继续执行")
+                return True
+                
+            else:  # 取消
+                self.main_ui.log_message("❌ 用户取消了操作")
+                return False
+        
+        return True  # 没有修改，直接继续
+
     def step1_import_lookdev(self, *args):
         """步骤1: 导入Lookdev文件"""
+        # 检查文件保存状态
+        if not self._check_file_save_before_execution():
+            return
+            
         self.main_ui.log_message("\n=== 步骤1: 导入Lookdev文件 ===")
         self.main_ui.update_progress(1)
 
@@ -342,6 +502,10 @@ Lookdev文件: {summary['lookdev_file']}
 
     def step2_import_and_connect_animation_abc(self, *args):
         """步骤2: 导入动画ABC并连接"""
+        # 检查文件保存状态
+        if not self._check_file_save_before_execution():
+            return
+            
         self.main_ui.log_message("\n=== 步骤2: 导入动画ABC并连接 ===")
         self.main_ui.update_progress(2)
 
@@ -360,6 +524,10 @@ Lookdev文件: {summary['lookdev_file']}
 
     def step3_import_camera_abc(self, *args):
         """步骤3: 导入动画相机ABC"""
+        # 检查文件保存状态
+        if not self._check_file_save_before_execution():
+            return
+            
         self.main_ui.log_message("\n=== 步骤3: 导入动画相机ABC ===")
         self.main_ui.update_progress(3)
 
@@ -378,6 +546,10 @@ Lookdev文件: {summary['lookdev_file']}
 
     def step4_setup_hair_cache(self, *args):
         """步骤4: 设置毛发缓存路径"""
+        # 检查文件保存状态
+        if not self._check_file_save_before_execution():
+            return
+            
         self.main_ui.log_message("\n=== 步骤4: 设置毛发缓存路径 ===")
         self.main_ui.update_progress(4)
 
@@ -396,6 +568,10 @@ Lookdev文件: {summary['lookdev_file']}
 
     def step5_fix_materials(self, *args):
         """步骤5: 检查修复材质"""
+        # 检查文件保存状态
+        if not self._check_file_save_before_execution():
+            return
+            
         self.main_ui.log_message("\n=== 步骤5: 检查修复材质 ===")
         self.main_ui.update_progress(5)
 
@@ -413,6 +589,10 @@ Lookdev文件: {summary['lookdev_file']}
 
     def step6_setup_scene(self, *args):
         """步骤6: 设置场景参数"""
+        # 检查文件保存状态
+        if not self._check_file_save_before_execution():
+            return
+            
         self.main_ui.log_message("\n=== 步骤6: 设置场景参数 ===")
         self.main_ui.update_progress(6)
 
@@ -430,6 +610,10 @@ Lookdev文件: {summary['lookdev_file']}
 
     def execute_all_steps(self, *args):
         """一键执行所有步骤"""
+        # 检查文件保存状态
+        if not self._check_file_save_before_execution():
+            return
+            
         self.main_ui.log_message("\n" + "=" * 50)
         self.main_ui.log_message("开始一键执行所有步骤")
         self.main_ui.log_message("=" * 50)
