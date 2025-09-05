@@ -625,10 +625,16 @@ class AnimationManager:
                        f'|{self.fur_namespace}:chr_{lookdev_namespace.replace("_lookdev", "")}_growthmesh_grp')
             lookdev_fur = (f'|{lookdev_namespace}:Master|{lookdev_namespace}:GEO|{lookdev_namespace}:CFX'
                            f'|{lookdev_namespace}:chr_{lookdev_namespace.replace("_lookdev", "")}_growthmesh_grp')
-            print(cfx_fur, lookdev_fur)
-            self.blendshape_manager.create_precise_blendshapes_between_groups(
+            node = self.blendshape_manager.create_precise_blendshapes_between_groups(
                 cfx_fur, lookdev_fur
             )
+            if not node:
+                cfx_fur = f'|{self.fur_namespace}:fur'
+                lookdev_fur = (f'|{lookdev_namespace}:Master|{lookdev_namespace}:GEO|{lookdev_namespace}:CFX'
+                               f'|{lookdev_namespace}:chr_{lookdev_namespace.replace("_lookdev", "")}_growthmesh_grp')
+                node = self.blendshape_manager.create_precise_blendshapes_between_groups(
+                    cfx_fur, lookdev_fur
+                )
 
         except Exception as e:
             print(f"❌ 处理特殊组BlendShape失败: {str(e)}")
