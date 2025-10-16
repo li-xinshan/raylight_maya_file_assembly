@@ -1,13 +1,13 @@
+# coding=utf-8
 """
 动画管理模块
 负责处理动画连接、BlendShape创建和毛发布料处理
 """
-import glob
 
 import maya.cmds as cmds
 import os
 import re
-import sys
+import glob
 
 # 简化的直接导入
 try:
@@ -158,6 +158,9 @@ class AnimationManager:
             from config.config_manager import ConfigManager
             config_manager = ConfigManager()
             hair_template = config_manager.base_paths.get('hair_cache_template').format(sequence=sequence, shot=shot)
+            cloth_template = config_manager.base_paths.get('cloth_cache_template').format(
+                sequence=sequence, shot=shot, lookdev_namespace=lookdev_namespace.replace("_lookdev", '')
+            )
 
             # 查找毛发文件
             fur_file = self._find_fur_cache_file(hair_template)
@@ -166,7 +169,7 @@ class AnimationManager:
                 print(f"  基于模板找到毛发文件: {os.path.basename(fur_file)}")
 
             # 查找布料文件
-            cloth_file = self._find_cloth_cache_file(hair_template, lookdev_namespace)
+            cloth_file = self._find_cloth_cache_file(cloth_template, lookdev_namespace)
             if cloth_file:
                 self.cloth_files.append(cloth_file)
                 print(f"  基于模板找到布料文件: {os.path.basename(cloth_file)}")
@@ -175,83 +178,86 @@ class AnimationManager:
             print(f"基于模板查找CFX文件失败: {str(e)}")
 
     def _find_fur_cache_file(self, hair_template):
-        """查找毛发解算文件（基于旧版本逻辑）"""
+        """查找毛发解算文件（基于新版本逻辑，默认返回最新版本）"""
         try:
-            print(hair_template)
-            # 解析路径获取hair目录
-            path_parts = hair_template.replace('\\', '/').split('/')
-            hair_index = -1
-            for i, part in enumerate(path_parts):
-                if part == 'hair':
-                    hair_index = i
-                    break
+            print(f"毛发模板路径: {hair_template}")
 
-            if hair_index < 0:
-                print("无法从模板路径找到hair目录")
+            # 获取所有匹配的文件路径
+            all_files = glob.glob(hair_template)
+
+            if not all_files:
+                print("未找到任何匹配的文件")
                 return None
 
-            # 构建hair目录路径
-            hair_dir = '/'.join(path_parts[:hair_index + 1])
-            hair_dir = hair_dir.replace('/', '\\')
+            # 从文件路径中提取版本号并分组
+            version_files = []
+            for file_path in all_files:
+                # 从路径中提取版本号 (如 v001, v002)
+                version_match = re.search(
+                    r'/(v\d+)/', file_path.replace('\\', '/')
+                )
+                if version_match:
+                    version = version_match.group(1)
+                    version_files.append((version, file_path))
 
-            print(f"搜索毛发解算文件目录: {hair_dir}")
-
-            if not os.path.exists(hair_dir):
-                print(f"目录不存在: {hair_dir}")
+            if not version_files:
+                print("未找到任何版本目录")
                 return None
 
-            abc = glob.glob(os.path.join(hair_dir, '*/growmesh_batch/*.abc'))
+            # 按版本号排序（降序，最新版本在前）
+            version_files.sort(key=lambda x: x[0], reverse=True)
 
-            # 查找ABC文件
-            if abc:
-                fur_file_path = abc[0]
-                print(f"找到候选毛发文件: {fur_file_path}")
-                return fur_file_path
+            print(f"找到版本: {list(set([v[0] for v in version_files]))}")
+            print(f"使用最新版本: {version_files[0][0]}")
+            print(f"找到毛发文件: {version_files[0][1]}")
 
-            return None
+            return version_files[0][1]
 
         except Exception as e:
             print(f"查找毛发解算文件失败: {str(e)}")
+            import traceback
+            traceback.print_exc()
             return None
 
     def _find_cloth_cache_file(self, hair_template, lookdev_namespace):
-        """查找布料解算文件（基于旧版本逻辑）"""
+        """查找布料解算文件（基于新版本路径逻辑，默认返回最新版本）"""
         try:
-            # 解析路径获取基础cfx目录
-            path_parts = hair_template.replace('\\', '/').split('/')
-            alembic_index = -1
-            for i, part in enumerate(path_parts):
-                if part == 'alembic':
-                    alembic_index = i
-                    break
+            print(f"布料模板路径: {hair_template}")
 
-            if alembic_index < 0:
-                print("无法从模板路径找到alembic目录")
+
+            # 查找所有匹配的ABC文件
+            all_cloth_files = glob.glob(hair_template)
+
+            if not all_cloth_files:
+                print("未找到任何布料文件")
                 return None
 
-            # 构建cloth目录路径
-            cloth_dir = ('/'.join(path_parts[:alembic_index + 1]) + '/cloth' + r"{}_01".
-                         format(lookdev_namespace.replace("_lookdev", '')))
-            cloth_dir = cloth_dir.replace('/', '\\')
+            # 从文件路径中提取版本号并分组
+            version_files = []
+            for file_path in all_cloth_files:
+                # 从路径中提取版本号
+                version_match = re.search(r'/(v\d+)/', file_path.replace('\\', '/'))
+                if version_match:
+                    version = version_match.group(1)
+                    version_files.append((version, file_path))
 
-            print(f"搜索布料解算文件目录: {cloth_dir}")
-
-            if not os.path.exists(cloth_dir):
-                print(f"目录不存在: {cloth_dir}")
+            if not version_files:
+                print("未找到任何版本的布料文件")
                 return None
 
-            # 查找ABC文件
-            for root, dirs, files in os.walk(cloth_dir):
-                for file in files:
-                    if file.endswith('.abc'):
-                        cloth_file_path = os.path.join(root, file)
-                        print(f"找到候选布料文件: {cloth_file_path}")
-                        return cloth_file_path
+            # 按版本号排序（降序，最新版本在前）
+            version_files.sort(key=lambda x: x[0], reverse=True)
 
-            return None
+            print(f"找到版本: {list(set([v[0] for v in version_files]))}")
+            print(f"使用最新版本: {version_files[0][0]}")
+            print(f"找到布料文件: {version_files[0][1]}")
+
+            return version_files[0][1]
 
         except Exception as e:
             print(f"查找布料解算文件失败: {str(e)}")
+            import traceback
+            traceback.print_exc()
             return None
 
     def import_and_connect_fur_cache(self):

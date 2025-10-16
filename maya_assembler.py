@@ -238,87 +238,100 @@ def initializePlugin(mobject):
     mplugin = omm.MFnPlugin(mobject, "LookdevAnimationTools", "3.0", "any")
 
     # 删除已存在的菜单
-    if cmds.menu("menuLookdevAnimation", exists=True):
-        cmds.deleteUI("menuLookdevAnimation", menu=True)
+    if cmds.menu("menuRaylight", exists=True):
+        cmds.deleteUI("menuRaylight", menu=True)
 
     # 获取主窗口
     gMainWindow = mel.eval("global string $gMainWindow;$temp = $gMainWindow")
 
-    # 创建主菜单
-    cmds.menu("menuLookdevAnimation",
-              label="Lookdev动画工具 v3.0",
-              parent=gMainWindow,
-              tearOff=True)
+    # 创建主菜单 - Raylight
+    raylight_menu = cmds.menu("menuRaylight",
+                             label="Raylight",
+                             parent=gMainWindow,
+                             tearOff=True)
 
-    # 添加菜单项
-    cmds.menuItem(label="显示主界面",
+    # 创建Light子菜单
+    light_submenu = cmds.menuItem(label="Light", subMenu=True, parent=raylight_menu)
+
+    # 在Light子菜单中添加Lookdev动画工具
+    cmds.menuItem(label="Lookdev动画组装工具",
                   command=show_lookdev_animation_setup_ui,
-                  annotation="打开Lookdev动画组装工具主界面")
+                  annotation="打开Lookdev动画组装工具主界面",
+                  parent=light_submenu)
 
-    cmds.menuItem(label="显示主界面 (带配置)",
+    cmds.menuItem(label="Lookdev工具 (带配置)",
                   command=lambda x: show_lookdev_animation_setup_ui("example_config.json"),
-                  annotation="打开主界面并加载示例配置")
+                  annotation="打开主界面并加载示例配置",
+                  parent=light_submenu)
 
-    cmds.menuItem(divider=True)
+    cmds.menuItem(divider=True, parent=light_submenu)
 
     cmds.menuItem(label="快速设置",
                   command=quick_setup_lookdev_animation,
-                  annotation="快速设置Lookdev和动画")
+                  annotation="快速设置Lookdev和动画",
+                  parent=light_submenu)
 
-    cmds.menuItem(label="从选择ABC获取时间",
+    cmds.menuItem(label="从ABC获取时间",
                   command=get_time_from_selected_abc,
-                  annotation="从选择的ABC节点获取时间范围")
+                  annotation="从选择的ABC节点获取时间范围",
+                  parent=light_submenu)
 
-    cmds.menuItem(divider=True)
+    cmds.menuItem(divider=True, parent=light_submenu)
 
-    # 子菜单 - 工具
-    tools_submenu = cmds.menuItem(label="工具", subMenu=True)
+    # Light工具子菜单
+    light_tools_submenu = cmds.menuItem(label="工具", subMenu=True, parent=light_submenu)
 
     cmds.menuItem(label="播放动画",
                   command=lambda x: cmds.play(forward=True),
-                  annotation="播放动画")
+                  annotation="播放动画",
+                  parent=light_tools_submenu)
 
     cmds.menuItem(label="停止动画",
                   command=lambda x: cmds.play(state=False),
-                  annotation="停止动画")
+                  annotation="停止动画",
+                  parent=light_tools_submenu)
 
     cmds.menuItem(label="适配视图",
                   command=lambda x: (cmds.select(all=True), cmds.viewFit(), cmds.select(clear=True)),
-                  annotation="适配视图到所有对象")
+                  annotation="适配视图到所有对象",
+                  parent=light_tools_submenu)
 
-    cmds.menuItem(divider=True)
+    cmds.menuItem(divider=True, parent=light_tools_submenu)
 
     cmds.menuItem(label="选择ABC节点",
                   command=lambda x: cmds.select(cmds.ls(type="AlembicNode")) if cmds.ls(
                       type="AlembicNode") else cmds.warning("没有ABC节点"),
-                  annotation="选择场景中的所有ABC节点")
+                  annotation="选择场景中的所有ABC节点",
+                  parent=light_tools_submenu)
 
-    # 子菜单 - 帮助
-    help_submenu = cmds.menuItem(label="帮助", subMenu=True)
+    # Light帮助子菜单
+    light_help_submenu = cmds.menuItem(label="帮助", subMenu=True, parent=light_submenu)
 
     cmds.menuItem(label="关于",
                   command=lambda x: cmds.confirmDialog(
                       title="关于",
-                      message="Lookdev动画组装工具 v3.0 (模块化重构版)\n\n• 原版本: 1451行代码\n• 重构版: ~200行主文件 + 模块化架构\n• 代码减少: 86%\n\n功能保持完整的同时大幅简化了代码结构",
+                      message="Raylight Lookdev动画组装工具 v3.0\n\n• 模块化重构版\n• 支持批量导入\n• 智能相机处理\n• 文件保存检查\n\nPowered by Raylight Pipeline",
                       button=["确定"]),
-                  annotation="显示关于信息")
+                  annotation="显示关于信息",
+                  parent=light_help_submenu)
 
     cmds.menuItem(label="使用说明",
                   command=lambda x: cmds.confirmDialog(
                       title="使用说明",
-                      message="使用说明 (v3.0 模块化重构版)：\n\n✅ 完全模块化架构\n✅ 代码行数减少86%\n✅ 功能完整保留\n✅ 维护性大幅提升\n\n详细说明请查看主界面的帮助菜单。",
+                      message="Raylight Lookdev工具使用说明：\n\n✅ 支持批量资产导入\n✅ 智能相机处理避免重复\n✅ 执行前文件保存检查\n✅ 支持chr/prp资产分类\n\n详细说明请查看主界面的帮助菜单。",
                       button=["确定"]),
-                  annotation="显示使用说明")
+                  annotation="显示使用说明",
+                  parent=light_help_submenu)
 
-    print("Lookdev动画工具插件已加载 v3.0 (模块化重构版)")
+    print("Raylight Lookdev动画工具插件已加载 v3.0")
 
 
 def uninitializePlugin(mobject):
     """Uninitialize the script plug-in"""
-    if cmds.menu("menuLookdevAnimation", exists=True):
-        cmds.deleteUI("menuLookdevAnimation", menu=True)
+    if cmds.menu("menuRaylight", exists=True):
+        cmds.deleteUI("menuRaylight", menu=True)
 
-    print("Lookdev动画工具插件已卸载")
+    print("Raylight Lookdev动画工具插件已卸载")
 
 
 # 主函数
