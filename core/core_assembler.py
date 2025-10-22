@@ -249,7 +249,7 @@ class CoreAssembler:
     def step4_setup_hair_cache(self):
         """步骤4: 设置毛发缓存路径"""
         hair_template = self.config_manager.base_paths.get('hair_cache_template')
-        return self.coordinator.step4_setup_hair_cache(hair_template, self.sequence, self.shot)
+        return self.coordinator.step4_setup_hair_cache(hair_template, self.sequence, self.shot, self.lookdev_namespace)
     
     def step5_fix_materials(self):
         """步骤5: 检查修复材质"""

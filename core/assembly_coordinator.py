@@ -150,7 +150,7 @@ class AssemblyCoordinator:
         else:
             return False, None, None
 
-    def step4_setup_hair_cache(self, hair_cache_template, sequence, shot):
+    def step4_setup_hair_cache(self, hair_cache_template, sequence, shot, namespaces):
         """
         步骤4: 设置毛发缓存
         
@@ -158,12 +158,13 @@ class AssemblyCoordinator:
             hair_cache_template (str): 毛发缓存模板
             sequence (str): 场景
             shot (str): 镜头
+            namespaces: namese
         Returns:
             bool: 是否成功
         """
         print("\n=== 步骤4: 设置毛发缓存 ===")
 
-        a = hair_cache_template.format(sequence=sequence, shot=shot)
+        a = hair_cache_template.format(sequence=sequence, shot=shot, lookdev_namespace=namespaces.replace("_lookdev", ''))
         print(a)
         results = self.xgen_manager.setup_hair_cache(a)
         print(results)

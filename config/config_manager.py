@@ -28,7 +28,7 @@ class ConfigManager:
             'assets_root': 'P:\\LHSN\\assets',
             'publish_root': 'P:\\LHSN\\publish',
             'lookdev_template': '{assets_root}\\{asset_type}\\{asset_name}\\lookdev\\maya\\publish',
-            'hair_cache_template': 'P:/LHSN/publish/shot/{sequence}/{shot}/element/cfx/cfx/cache/*/hair/*/growmesh_batch/*.abc',
+            'hair_cache_template': 'P:/LHSN/publish/shot/{sequence}/{shot}/element/cfx/cfx/cache/*/hair/{lookdev_namespace}*/growmesh_batch/*.abc',
             'cloth_cache_template': 'P:/LHSN/publish/shot/{sequence}/{shot}/element/cfx/cfx/cache/*/cloth/{lookdev_namespace}*/{lookdev_namespace}*.abc'
         }
         

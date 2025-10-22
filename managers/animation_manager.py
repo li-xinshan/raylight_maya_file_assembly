@@ -157,7 +157,8 @@ class AnimationManager:
         try:
             from config.config_manager import ConfigManager
             config_manager = ConfigManager()
-            hair_template = config_manager.base_paths.get('hair_cache_template').format(sequence=sequence, shot=shot)
+            hair_template = config_manager.base_paths.get('hair_cache_template').format(
+                sequence=sequence, shot=shot, lookdev_namespace=lookdev_namespace.replace("_lookdev", ''))
             cloth_template = config_manager.base_paths.get('cloth_cache_template').format(
                 sequence=sequence, shot=shot, lookdev_namespace=lookdev_namespace.replace("_lookdev", '')
             )
