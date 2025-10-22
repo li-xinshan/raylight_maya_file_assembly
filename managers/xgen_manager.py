@@ -29,6 +29,9 @@ class XGenManager:
         if cache_template is None:
             cache_template = self.default_hair_cache_template
 
+        cache_template = os.path.join(
+            os.path.dirname(os.path.dirname(cache_template)), 'outcurve', '*.abc'
+        )
         print(f"设置XGen毛发缓存路径...")
         print(f"缓存模板: {cache_template}")
 

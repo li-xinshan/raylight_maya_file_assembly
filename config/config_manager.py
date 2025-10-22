@@ -28,8 +28,6 @@ class ConfigManager:
             'assets_root': 'P:\\LHSN\\assets',
             'publish_root': 'P:\\LHSN\\publish',
             'lookdev_template': '{assets_root}\\{asset_type}\\{asset_name}\\lookdev\\maya\\publish',
-            #'hair_cache_template': 'P:/LHSN/cache/dcc/shot/{sequence}/{shot}/cfx/alembic/hair/*/outcurve/*.abc'
-            #P:\LHSN\publish\shot\s310\c0310\element\cfx\cfx\cache\v001\hair\dql_b_01\outcurve
             'hair_cache_template': 'P:/LHSN/publish/shot/{sequence}/{shot}/element/cfx/cfx/cache/*/hair/*/growmesh_batch/*.abc',
             'cloth_cache_template': 'P:/LHSN/publish/shot/{sequence}/{shot}/element/cfx/cfx/cache/*/cloth/{lookdev_namespace}*/{lookdev_namespace}*.abc'
         }
